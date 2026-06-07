@@ -1,0 +1,73 @@
+<pngx-page-header title="Quản lý workspace" i18n-title [loading]="loading"></pngx-page-header>
+
+<div class="project-management">
+  <section class="summary-band">
+    <form class="input-group input-group-sm" (ngSubmit)="searchWorkspaces()">
+      <span class="input-group-text">
+        <i-bs name="search"></i-bs>
+      </span>
+      <input
+        class="form-control"
+        name="workspaceSearch"
+        [(ngModel)]="search"
+        placeholder="Tìm kiếm theo tên"
+        i18n-placeholder />
+      @if (search) {
+        <button class="btn btn-outline-secondary" type="button" (click)="clearSearch()">
+          <i-bs name="x"></i-bs>
+        </button>
+      }
+      <button class="btn btn-outline-primary" type="submit" i18n>Search</button>
+    </form>
+
+    @if (totalWorkspaces) {
+      <ngb-pagination
+        [pageSize]="pageSize"
+        [collectionSize]="totalWorkspaces"
+        [(page)]="page"
+        [maxSize]="5"
+        [rotate]="true"
+        size="sm"
+        aria-label="Workspace pagination"
+        (pageChange)="reload()">
+      </ngb-pagination>
+    }
+  </section>
+
+  <section class="form-band">
+    <form class="create-form" (ngSubmit)="createWorkspace()">
+      <h2 i18n>Workspace</h2>
+      <input class="form-control" name="workspaceName" [(ngModel)]="draft.name" placeholder="Name" i18n-placeholder />
+      <input class="form-control" name="workspaceDescription" [(ngModel)]="draft.description" placeholder="Description" i18n-placeholder />
+      <button class="btn btn-sm btn-outline-primary" type="submit">
+        <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Create</ng-container>
+      </button>
+    </form>
+  </section>
+
+  <section class="list-grid">
+    @for (workspace of workspaces; track workspace.id) {
+      <article class="list-card">
+        <i-bs name="hdd-stack"></i-bs>
+        <div>
+          <div class="fw-semibold">{{ workspace.name }}</div>
+          <div class="small text-muted">{{ workspace.description }}</div>
+          <div class="task-meta">
+            <span>
+              <ng-container i18n>Created by</ng-container>:
+              {{ workspace.owner_username || workspace.owner }}
+            </span>
+            @if (workspace.created_at) {
+              <span>
+                <ng-container i18n>Created</ng-container>:
+                {{ workspace.created_at | customDate:'short' }}
+              </span>
+            }
+          </div>
+        </div>
+      </article>
+    } @empty {
+      <div class="text-muted small" i18n>No workspaces found.</div>
+    }
+  </section>
+</div>

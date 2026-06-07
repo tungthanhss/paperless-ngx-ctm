@@ -1,0 +1,58 @@
+<pngx-page-header title="Tiếp nhận yêu cầu" i18n-title [loading]="loading"></pngx-page-header>
+
+<div class="project-management">
+  <section class="pm-toolbar">
+    <div class="selector">
+      <label class="form-label" for="workspaceSelect" i18n>Workspace</label>
+      <select id="workspaceSelect" class="form-select" [(ngModel)]="selectedWorkspaceId" (ngModelChange)="reloadProjects()">
+        @for (workspace of workspaces; track workspace.id) {
+          <option [ngValue]="workspace.id">{{ workspace.name }}</option>
+        }
+      </select>
+    </div>
+    <div class="selector">
+      <label class="form-label" for="projectSelect" i18n>Project</label>
+      <select id="projectSelect" class="form-select" [(ngModel)]="selectedProjectId" (ngModelChange)="reloadRequests()">
+        @for (project of projects; track project.id) {
+          <option [ngValue]="project.id">{{ project.key }} · {{ project.name }}</option>
+        }
+      </select>
+    </div>
+  </section>
+
+  <section class="intake-grid">
+    <form class="intake-form" (ngSubmit)="createRequest()">
+      <h2 i18n>New request</h2>
+      <input class="form-control" name="intakeTitle" [(ngModel)]="draft.title" placeholder="Title" i18n-placeholder />
+      <input class="form-control" name="sourceDepartment" [(ngModel)]="draft.source_department" placeholder="Department" i18n-placeholder />
+      <textarea class="form-control" name="intakeDescription" rows="4" [(ngModel)]="draft.description" placeholder="Description" i18n-placeholder></textarea>
+      <button class="btn btn-sm btn-outline-primary" type="submit" [disabled]="!selectedProjectId">
+        <i-bs name="send" class="me-1"></i-bs><ng-container i18n>Submit</ng-container>
+      </button>
+    </form>
+    <div class="request-list">
+      @for (request of requests; track request.id) {
+        <article class="request-item">
+          <div class="d-flex justify-content-between gap-3">
+            <div>
+              <div class="fw-semibold">{{ request.title }}</div>
+              <div class="small text-muted">{{ request.source_department }} · {{ request.status }}</div>
+            </div>
+          </div>
+          <p>{{ request.description }}</p>
+          @if (request.status === 'open') {
+            <textarea class="form-control mb-2" rows="2" [(ngModel)]="reviewComment" placeholder="Review comment" i18n-placeholder></textarea>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-success" type="button" (click)="accept(request)">
+                <i-bs name="check-circle" class="me-1"></i-bs><ng-container i18n>Accept</ng-container>
+              </button>
+              <button class="btn btn-outline-danger" type="button" (click)="decline(request)">
+                <i-bs name="slash-circle" class="me-1"></i-bs><ng-container i18n>Decline</ng-container>
+              </button>
+            </div>
+          }
+        </article>
+      }
+    </div>
+  </section>
+</div>

@@ -152,8 +152,16 @@ from documents.models import CustomField
 from documents.models import CustomFieldInstance
 from documents.models import Document
 from documents.models import DocumentType
+from documents.models import IntakeRequest
 from documents.models import Note
 from documents.models import PaperlessTask
+from documents.models import Project
+from documents.models import ProjectCycle
+from documents.models import ProjectIssue
+from documents.models import ProjectLabel
+from documents.models import ProjectModule
+from documents.models import ProjectPage
+from documents.models import ProjectState
 from documents.models import SavedView
 from documents.models import ShareLink
 from documents.models import ShareLinkBundle
@@ -163,6 +171,7 @@ from documents.models import UiSettings
 from documents.models import Workflow
 from documents.models import WorkflowAction
 from documents.models import WorkflowTrigger
+from documents.models import Workspace
 from documents.permissions import AcknowledgeTasksPermissions
 from documents.permissions import PaperlessAdminPermissions
 from documents.permissions import PaperlessNotePermissions
@@ -192,9 +201,17 @@ from documents.serialisers import DocumentVersionLabelSerializer
 from documents.serialisers import DocumentVersionSerializer
 from documents.serialisers import EditPdfDocumentsSerializer
 from documents.serialisers import EmailSerializer
+from documents.serialisers import IntakeRequestSerializer
 from documents.serialisers import MergeDocumentsSerializer
 from documents.serialisers import NotesSerializer
 from documents.serialisers import PostDocumentSerializer
+from documents.serialisers import ProjectCycleSerializer
+from documents.serialisers import ProjectIssueSerializer
+from documents.serialisers import ProjectLabelSerializer
+from documents.serialisers import ProjectModuleSerializer
+from documents.serialisers import ProjectPageSerializer
+from documents.serialisers import ProjectSerializer
+from documents.serialisers import ProjectStateSerializer
 from documents.serialisers import RemovePasswordDocumentsSerializer
 from documents.serialisers import ReprocessDocumentsSerializer
 from documents.serialisers import RotateDocumentsSerializer
@@ -215,6 +232,7 @@ from documents.serialisers import UiSettingsViewSerializer
 from documents.serialisers import WorkflowActionSerializer
 from documents.serialisers import WorkflowSerializer
 from documents.serialisers import WorkflowTriggerSerializer
+from documents.serialisers import WorkspaceSerializer
 from documents.signals import document_updated
 from documents.tasks import build_share_link_bundle
 from documents.tasks import consume_file
@@ -4763,6 +4781,326 @@ class WorkflowViewSet(ModelViewSet[Workflow]):
             ),
         )
     )
+
+
+def _workspace_access_filter(user: User) -> Q:
+    return Q(owner=user) | Q(members=user)
+
+
+def _project_access_filter(user: User) -> Q:
+    return (
+        Q(owner=user)
+        | Q(lead=user)
+        | Q(members=user)
+        | Q(workspace__owner=user)
+        | Q(workspace__members=user)
+    )
+
+
+class WorkspaceViewSet(ModelViewSet[Workspace]):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = WorkspaceSerializer
+    pagination_class = StandardPagination
+    filter_backends = (DjangoFilterBackend, OrderingFilter, SearchFilter)
+    filterset_fields = ("owner",)
+    ordering_fields = ("name", "created_at", "updated_at")
+    search_fields = ("name",)
+
+    def get_queryset(self):
+        return (
+            Workspace.objects.filter(_workspace_access_filter(self.request.user))
+            .select_related("owner")
+            .prefetch_related("members")
+            .distinct()
+        )
+
+    def perform_create(self, serializer):
+        workspace = serializer.save(owner=self.request.user)
+        workspace.members.add(self.request.user)
+
+
+class ProjectViewSet(ModelViewSet[Project]):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ProjectSerializer
+    pagination_class = StandardPagination
+    filter_backends = (DjangoFilterBackend, OrderingFilter, SearchFilter)
+    filterset_fields = ("workspace", "lead")
+    ordering_fields = ("name", "key", "created_at", "updated_at")
+    search_fields = ("name", "key", "description")
+
+    def get_queryset(self):
+        return (
+            Project.objects.filter(_project_access_filter(self.request.user))
+            .select_related("workspace", "owner", "lead")
+            .prefetch_related("members")
+            .distinct()
+        )
+
+    def perform_create(self, serializer):
+        workspace = serializer.validated_data["workspace"]
+        if not Workspace.objects.filter(
+            _workspace_access_filter(self.request.user),
+            pk=workspace.pk,
+        ).exists():
+            raise PermissionDenied("You do not have access to this workspace.")
+        project = serializer.save(
+            owner=self.request.user,
+            lead=serializer.validated_data.get("lead") or self.request.user,
+        )
+        project.members.add(self.request.user)
+
+    def perform_update(self, serializer):
+        workspace = serializer.validated_data.get(
+            "workspace",
+            serializer.instance.workspace,
+        )
+        if not Workspace.objects.filter(
+            _workspace_access_filter(self.request.user),
+            pk=workspace.pk,
+        ).exists():
+            raise PermissionDenied("You do not have access to this workspace.")
+        serializer.save()
+
+
+class _ProjectChildViewSet(ModelViewSet):
+    permission_classes = (IsAuthenticated,)
+    pagination_class = StandardPagination
+    filter_backends = (DjangoFilterBackend, OrderingFilter, SearchFilter)
+
+    def get_project_queryset(self):
+        return Project.objects.filter(_project_access_filter(self.request.user))
+
+    def ensure_project_access(self, project: Project) -> None:
+        if not self.get_project_queryset().filter(pk=project.pk).exists():
+            raise PermissionDenied("You do not have access to this project.")
+
+    def perform_create(self, serializer):
+        self.ensure_project_access(serializer.validated_data["project"])
+        serializer.save()
+
+    def perform_update(self, serializer):
+        project = serializer.validated_data.get("project", serializer.instance.project)
+        self.ensure_project_access(project)
+        serializer.save()
+
+
+class ProjectStateViewSet(_ProjectChildViewSet):
+    serializer_class = ProjectStateSerializer
+    filterset_fields = ("project", "is_default", "is_completed")
+    ordering_fields = ("position", "name")
+    search_fields = ("name",)
+
+    def get_queryset(self):
+        return ProjectState.objects.filter(
+            project__in=self.get_project_queryset(),
+        ).select_related("project")
+
+    def _sync_default(self, state: ProjectState) -> None:
+        if state.is_default:
+            ProjectState.objects.filter(project=state.project).exclude(
+                pk=state.pk,
+            ).update(
+                is_default=False,
+            )
+
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        self._sync_default(serializer.instance)
+
+    def perform_update(self, serializer):
+        super().perform_update(serializer)
+        self._sync_default(serializer.instance)
+
+    @action(detail=True, methods=["post"])
+    def set_default(self, request, pk=None):
+        state = self.get_object()
+        ProjectState.objects.filter(project=state.project).update(is_default=False)
+        state.is_default = True
+        state.save(update_fields=["is_default"])
+        return Response(self.get_serializer(state).data)
+
+
+class ProjectLabelViewSet(_ProjectChildViewSet):
+    serializer_class = ProjectLabelSerializer
+    filterset_fields = ("project",)
+    ordering_fields = ("name",)
+    search_fields = ("name",)
+
+    def get_queryset(self):
+        return ProjectLabel.objects.filter(
+            project__in=self.get_project_queryset(),
+        ).select_related("project")
+
+
+class ProjectCycleViewSet(_ProjectChildViewSet):
+    serializer_class = ProjectCycleSerializer
+    filterset_fields = ("project", "is_active")
+    ordering_fields = ("starts_at", "ends_at", "name")
+    search_fields = ("name",)
+
+    def get_queryset(self):
+        return ProjectCycle.objects.filter(
+            project__in=self.get_project_queryset(),
+        ).select_related("project")
+
+    @action(detail=True, methods=["post"])
+    def rollover(self, request, pk=None):
+        cycle = self.get_object()
+        next_cycle_id = request.data.get("next_cycle")
+        if not next_cycle_id:
+            raise ValidationError({"next_cycle": "This field is required."})
+        next_cycle = get_object_or_404(
+            ProjectCycle,
+            pk=next_cycle_id,
+            project=cycle.project,
+        )
+        moved = (
+            ProjectIssue.objects.filter(
+                cycle=cycle,
+            )
+            .exclude(state__is_completed=True)
+            .update(cycle=next_cycle)
+        )
+        cycle.is_active = False
+        cycle.save(update_fields=["is_active"])
+        return Response({"moved": moved, "cycle": self.get_serializer(cycle).data})
+
+
+class ProjectModuleViewSet(_ProjectChildViewSet):
+    serializer_class = ProjectModuleSerializer
+    filterset_fields = ("project",)
+    ordering_fields = ("name", "target_date")
+    search_fields = ("name", "description")
+
+    def get_queryset(self):
+        return ProjectModule.objects.filter(
+            project__in=self.get_project_queryset(),
+        ).select_related("project")
+
+
+class ProjectIssueViewSet(_ProjectChildViewSet):
+    serializer_class = ProjectIssueSerializer
+    filterset_fields = ("project", "assignee", "state", "priority", "cycle", "module")
+    ordering_fields = ("created_at", "updated_at", "priority", "due_date", "estimate")
+    search_fields = ("title", "description")
+
+    def get_queryset(self):
+        return (
+            ProjectIssue.objects.filter(project__in=self.get_project_queryset())
+            .select_related(
+                "project",
+                "assignee",
+                "created_by",
+                "state",
+                "cycle",
+                "module",
+            )
+            .prefetch_related("labels")
+        )
+
+    def perform_create(self, serializer):
+        self.ensure_project_access(serializer.validated_data["project"])
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=["post"])
+    def quick_add(self, request):
+        project = get_object_or_404(
+            self.get_project_queryset(),
+            pk=request.data.get("project"),
+        )
+        text = str(request.data.get("text", "")).strip()
+        if not text:
+            raise ValidationError({"text": "This field is required."})
+
+        label_names = re.findall(r"(?<!\w)#([\w-]+)", text)
+        usernames = re.findall(r"(?<!\w)@([\w.@+-]+)", text)
+        title = re.sub(r"(?<!\w)[#@][\w.@+-]+", "", text).strip()
+        if not title:
+            raise ValidationError({"text": "Issue title is required."})
+
+        assignee = (
+            User.objects.filter(username=usernames[0]).first() if usernames else None
+        )
+        state = ProjectState.objects.filter(project=project, is_default=True).first()
+        issue = ProjectIssue.objects.create(
+            project=project,
+            title=title,
+            assignee=assignee,
+            state=state,
+            created_by=request.user,
+        )
+        labels = [
+            ProjectLabel.objects.get_or_create(project=project, name=name)[0]
+            for name in label_names
+        ]
+        issue.labels.set(labels)
+        return Response(self.get_serializer(issue).data, status=status.HTTP_201_CREATED)
+
+
+class IntakeRequestViewSet(_ProjectChildViewSet):
+    serializer_class = IntakeRequestSerializer
+    filterset_fields = ("project", "status", "requester")
+    ordering_fields = ("created_at", "updated_at")
+    search_fields = ("title", "description", "source_department")
+
+    def get_queryset(self):
+        return IntakeRequest.objects.filter(
+            project__in=self.get_project_queryset(),
+        ).select_related("project", "requester", "accepted_issue")
+
+    def perform_create(self, serializer):
+        self.ensure_project_access(serializer.validated_data["project"])
+        serializer.save(requester=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def accept(self, request, pk=None):
+        intake = self.get_object()
+        if intake.status != IntakeRequest.Status.OPEN:
+            raise ValidationError({"status": "Only open requests can be accepted."})
+        state = ProjectState.objects.filter(
+            project=intake.project,
+            is_default=True,
+        ).first()
+        issue = ProjectIssue.objects.create(
+            project=intake.project,
+            title=intake.title,
+            description=intake.description,
+            state=state,
+            created_by=request.user,
+        )
+        intake.status = IntakeRequest.Status.ACCEPTED
+        intake.accepted_issue = issue
+        intake.review_comment = request.data.get("review_comment", "")
+        intake.save(
+            update_fields=["status", "accepted_issue", "review_comment", "updated_at"],
+        )
+        return Response(self.get_serializer(intake).data)
+
+    @action(detail=True, methods=["post"])
+    def decline(self, request, pk=None):
+        intake = self.get_object()
+        if intake.status != IntakeRequest.Status.OPEN:
+            raise ValidationError({"status": "Only open requests can be declined."})
+        intake.status = IntakeRequest.Status.DECLINED
+        intake.review_comment = request.data.get("review_comment", "")
+        intake.save(update_fields=["status", "review_comment", "updated_at"])
+        return Response(self.get_serializer(intake).data)
+
+
+class ProjectPageViewSet(_ProjectChildViewSet):
+    serializer_class = ProjectPageSerializer
+    filterset_fields = ("project", "created_by")
+    ordering_fields = ("title", "created_at", "updated_at")
+    search_fields = ("title",)
+
+    def get_queryset(self):
+        return ProjectPage.objects.filter(
+            project__in=self.get_project_queryset(),
+        ).select_related("project", "created_by")
+
+    def perform_create(self, serializer):
+        self.ensure_project_access(serializer.validated_data["project"])
+        serializer.save(created_by=self.request.user)
 
 
 class CustomFieldViewSet(PermissionsAwareDocumentCountMixin, ModelViewSet[CustomField]):

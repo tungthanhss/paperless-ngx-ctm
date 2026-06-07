@@ -1,0 +1,268 @@
+.project-management {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pm-toolbar,
+.form-band,
+.summary-band,
+.summary-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.pm-toolbar {
+  grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) minmax(18rem, 2fr);
+  align-items: end;
+}
+
+.pm-toolbar.single {
+  grid-template-columns: minmax(12rem, 24rem);
+}
+
+.form-band {
+  grid-template-columns: minmax(16rem, 32rem);
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--bs-border-color);
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.create-form,
+.planning-form,
+.intake-form,
+.page-form {
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+}
+
+.create-form h2,
+.planning-form h2,
+.planning-list h2,
+.intake-form h2,
+.page-form h2,
+.state-column h2 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.checks {
+  display: flex;
+  gap: 1rem;
+  min-height: 2rem;
+  align-items: center;
+}
+
+.summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.summary-band {
+  grid-template-columns: minmax(12rem, 1fr) max-content;
+  align-items: center;
+  padding: 0.75rem 0;
+}
+
+.stat-card,
+.list-card,
+.state-column,
+.task-item,
+.request-item {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.375rem;
+  background: var(--bs-body-bg);
+}
+
+.stat-card,
+.list-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.75rem;
+}
+
+.stat-card i-bs,
+.list-card i-bs {
+  flex: 0 0 auto;
+  color: var(--bs-secondary-color);
+  font-size: 1.25rem;
+}
+
+.list-card.split {
+  justify-content: space-between;
+}
+
+.list-grid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.metric {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.metric-label {
+  color: var(--bs-secondary-color);
+  font-size: 0.8rem;
+}
+
+.progress-wrap,
+.mini-progress {
+  min-width: 0;
+}
+
+.pm-tabs {
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+}
+
+.pm-tabs .nav-link {
+  white-space: nowrap;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.state-column {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.75rem;
+  background: var(--bs-tertiary-bg);
+}
+
+.state-column header,
+.task-row,
+.planning-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.task-item {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-left-width: 0.25rem;
+}
+
+.task-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.task-meta,
+.labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.task-meta {
+  color: var(--bs-secondary-color);
+  font-size: 0.8rem;
+}
+
+.label {
+  max-width: 100%;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  color: #fff;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.priority-urgent {
+  border-left-color: var(--bs-danger);
+}
+
+.priority-high {
+  border-left-color: var(--bs-warning);
+}
+
+.priority-medium {
+  border-left-color: var(--bs-primary);
+}
+
+.priority-low {
+  border-left-color: var(--bs-secondary);
+}
+
+.task-row select {
+  width: 9rem;
+}
+
+.planning-grid,
+.intake-grid,
+.pages-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.planning-list,
+.request-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.planning-row {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.planning-row .form-select {
+  width: 10rem;
+}
+
+.mini-progress {
+  width: 8rem;
+}
+
+.request-item {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+.request-item p {
+  margin: 0;
+  color: var(--bs-secondary-color);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 991.98px) {
+  .pm-toolbar,
+  .pm-toolbar.single,
+  .form-band,
+  .summary-band,
+  .planning-grid,
+  .intake-grid,
+  .pages-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .planning-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .planning-row .form-select,
+  .mini-progress,
+  .task-row select {
+    width: 100%;
+  }
+}

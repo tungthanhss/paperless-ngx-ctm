@@ -1,0 +1,121 @@
+<pngx-page-header title="Quản lý task" i18n-title [loading]="loading"></pngx-page-header>
+
+<div class="project-management">
+  <section class="pm-toolbar">
+    <div class="selector">
+      <label class="form-label" for="workspaceSelect" i18n>Workspace</label>
+      <select id="workspaceSelect" class="form-select" [(ngModel)]="selectedWorkspaceId" (ngModelChange)="reloadProjects()">
+        @for (workspace of workspaces; track workspace.id) {
+          <option [ngValue]="workspace.id">{{ workspace.name }}</option>
+        }
+      </select>
+    </div>
+    <div class="selector">
+      <label class="form-label" for="projectSelect" i18n>Project</label>
+      <select id="projectSelect" class="form-select" [(ngModel)]="selectedProjectId" (ngModelChange)="reloadProjectData()">
+        @for (project of projects; track project.id) {
+          <option [ngValue]="project.id">{{ project.key }} · {{ project.name }}</option>
+        }
+      </select>
+    </div>
+    <form class="quick-add" (ngSubmit)="quickAddTask()">
+      <label class="form-label" for="quickAddTask" i18n>Quick add task</label>
+      <div class="input-group">
+        <input id="quickAddTask" class="form-control" name="quickAddTask" [(ngModel)]="quickAddText" placeholder="Title #label @assignee" i18n-placeholder />
+        <button class="btn btn-primary" type="submit" [disabled]="!selectedProjectId">
+          <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Add</ng-container>
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <section class="summary-band">
+    <div>
+      <span class="metric">{{ tasks.length }}</span>
+      <span class="metric-label" i18n>Tasks</span>
+    </div>
+    <div>
+      <span class="metric">{{ completedTasks }}</span>
+      <span class="metric-label" i18n>Done</span>
+    </div>
+    <div class="progress-wrap">
+      <div class="d-flex justify-content-between small text-muted">
+        <span i18n>Progress</span>
+        <span>{{ progress }}%</span>
+      </div>
+      <div class="progress">
+        <div class="progress-bar" [style.width.%]="progress"></div>
+      </div>
+    </div>
+  </section>
+
+  <ul class="nav nav-tabs pm-tabs">
+    <li class="nav-item">
+      <button class="nav-link" [class.active]="view === 'board'" type="button" (click)="view = 'board'">
+        <i-bs name="diagram3" class="me-1"></i-bs><ng-container i18n>Board</ng-container>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" [class.active]="view === 'list'" type="button" (click)="view = 'list'">
+        <i-bs name="list-task" class="me-1"></i-bs><ng-container i18n>List</ng-container>
+      </button>
+    </li>
+  </ul>
+
+  @if (view === 'board') {
+    <section class="board">
+      @for (state of states; track state.id) {
+        <div class="state-column">
+          <header>
+            <div>
+              <h2>{{ state.name }}</h2>
+              <span class="text-muted small">{{ tasksForState(state).length }}</span>
+            </div>
+          </header>
+          @for (task of tasksForState(state); track task.id) {
+            <article class="task-item" [ngClass]="priorityClass(task.priority)">
+              <div class="task-title">{{ task.title }}</div>
+              <div class="task-meta">
+                <span>{{ task.priority }}</span>
+                @if (task.assignee_username) {
+                  <span>@{{ task.assignee_username }}</span>
+                }
+              </div>
+              <div class="labels">
+                @for (labelId of task.labels; track labelId) {
+                  <span class="label" [ngStyle]="{ background: labelColor(labelId) }">{{ labelName(labelId) }}</span>
+                }
+              </div>
+              <div class="btn-group btn-group-sm w-100">
+                @for (targetState of states; track targetState.id) {
+                  <button class="btn btn-outline-secondary" type="button" (click)="moveTask(task, targetState)" [disabled]="task.state === targetState.id">
+                    {{ targetState.name }}
+                  </button>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+  }
+
+  @if (view === 'list') {
+    <section class="list-group">
+      @for (task of tasks; track task.id) {
+        <article class="list-group-item task-row">
+          <div>
+            <div class="fw-semibold">{{ task.title }}</div>
+            <div class="small text-muted">{{ stateName(task) }} · {{ task.created_at }}</div>
+          </div>
+          <select class="form-select form-select-sm" [ngModel]="task.priority" (ngModelChange)="setPriority(task, $event)">
+            <option value="urgent" i18n>Urgent</option>
+            <option value="high" i18n>High</option>
+            <option value="medium" i18n>Medium</option>
+            <option value="low" i18n>Low</option>
+          </select>
+        </article>
+      }
+    </section>
+  }
+</div>

@@ -227,6 +227,57 @@
                 </div>
               </li>
             }
+            <li class="nav-item app-link">
+              <a class="nav-link" routerLink="work-management" routerLinkActive="active" (click)="closeMenu()"
+                ngbPopover="Quản lý công việc" i18n-ngbPopover [disablePopover]="!slimSidebarEnabled" placement="end"
+                container="body" triggers="mouseenter:mouseleave" popoverClass="popover-slim">
+                <i-bs class="me-2" name="boxes"></i-bs><span><ng-container i18n>Quản lý công việc</ng-container></span>
+              </a>
+              <div class="attributes-submenu ms-2" [ngbCollapse]="slimSidebarEnabled">
+                <ul class="nav flex-column">
+                  <li class="nav-item app-link">
+                    <a class="nav-link py-1" routerLink="work-management/dashboard" routerLinkActive="active" (click)="closeMenu()">
+                      <i-bs class="me-2" name="grid"></i-bs><span><ng-container i18n>Thống kê</ng-container></span>
+                    </a>
+                  </li>
+                  <li class="nav-item app-link">
+                    <a class="nav-link py-1" routerLink="work-management/workspaces" routerLinkActive="active" (click)="closeMenu()">
+                      <i-bs class="me-2" name="hdd-stack"></i-bs><span><ng-container i18n>Workspace</ng-container></span>
+                    </a>
+                  </li>
+                  <li class="nav-item app-link">
+                    <a class="nav-link py-1" routerLink="work-management/projects" routerLinkActive="active" (click)="closeMenu()">
+                      <i-bs class="me-2" name="diagram3"></i-bs><span><ng-container i18n>Project</ng-container></span>
+                    </a>
+                  </li>
+                  <li class="nav-item app-link">
+                    <a class="nav-link py-1" routerLink="work-management/states" routerLinkActive="active" (click)="closeMenu()">
+                      <i-bs class="me-2" name="sliders2-vertical"></i-bs><span><ng-container i18n>Workflow state</ng-container></span>
+                    </a>
+                  </li>
+                  <li class="nav-item app-link">
+                    <a class="nav-link py-1" routerLink="work-management/tasks" routerLinkActive="active" (click)="closeMenu()">
+                      <i-bs class="me-2" name="list-task"></i-bs><span><ng-container i18n>Task</ng-container></span>
+                    </a>
+                  </li>
+                  <li class="nav-item app-link">
+                    <a class="nav-link py-1" routerLink="work-management/planning" routerLinkActive="active" (click)="closeMenu()">
+                      <i-bs class="me-2" name="calendar-event"></i-bs><span><ng-container i18n>Kế hoạch</ng-container></span>
+                    </a>
+                  </li>
+                  <li class="nav-item app-link">
+                    <a class="nav-link py-1" routerLink="work-management/intake" routerLinkActive="active" (click)="closeMenu()">
+                      <i-bs class="me-2" name="clipboard"></i-bs><span><ng-container i18n>Intake</ng-container></span>
+                    </a>
+                  </li>
+                  <li class="nav-item app-link">
+                    <a class="nav-link py-1" routerLink="work-management/pages" routerLinkActive="active" (click)="closeMenu()">
+                      <i-bs class="me-2" name="journals"></i-bs><span><ng-container i18n>Pages</ng-container></span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </li>
             <li class="nav-item app-link" *pngxIfPermissions="{ action: PermissionAction.View, type: PermissionType.SavedView }">
               <a class="nav-link" routerLink="savedviews" routerLinkActive="active" (click)="closeMenu()"
                 ngbPopover="Saved Views" i18n-ngbPopover [disablePopover]="!slimSidebarEnabled" placement="end"

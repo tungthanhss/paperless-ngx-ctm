@@ -14,6 +14,7 @@ classifiers = [
 # TODO: Move certain things to groups and then utilize that further
 # This will allow testing to not install a webserver, mysql, etc
 dependencies = [
+  "autobahn>=21.3.1,<25",
   "azure-ai-documentintelligence>=1.0.2",
   "babel>=2.17",
   "bleach~=6.3.0",
@@ -247,7 +248,7 @@ isort.force-single-line = true
 
 [tool.codespell]
 write-changes = true
-ignore-words-list = "criterias,afterall,valeu,ureue,equest,ure,assertIn,Oktober,commitish"
+ignore-words-list = "criterias,afterall,valeu,ureue,equest,ure,assertIn,Oktober,commitish,cach,thay,tham"
 skip = """\
   src-ui/src/locale/*,src-ui/pnpm-lock.yaml,src-ui/e2e/*,src/paperless_mail/tests/samples/*,src/paperless/tests/samples\
   /mail/*,src/documents/tests/samples/*,*.po,*.json\

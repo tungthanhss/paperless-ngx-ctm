@@ -5,7 +5,9 @@
 # Virtual environment & similar
 .venv/
 ./src-ui/node_modules
+./src-ui/.angular
 ./src-ui/dist
+./src-ui/e2e
 # IDE folders
 .idea/
 .vscode/

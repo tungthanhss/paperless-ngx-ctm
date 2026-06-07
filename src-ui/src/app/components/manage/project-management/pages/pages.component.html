@@ -1,0 +1,43 @@
+<pngx-page-header title="Tài liệu project" i18n-title [loading]="loading"></pngx-page-header>
+
+<div class="project-management">
+  <section class="pm-toolbar">
+    <div class="selector">
+      <label class="form-label" for="workspaceSelect" i18n>Workspace</label>
+      <select id="workspaceSelect" class="form-select" [(ngModel)]="selectedWorkspaceId" (ngModelChange)="reloadProjects()">
+        @for (workspace of workspaces; track workspace.id) {
+          <option [ngValue]="workspace.id">{{ workspace.name }}</option>
+        }
+      </select>
+    </div>
+    <div class="selector">
+      <label class="form-label" for="projectSelect" i18n>Project</label>
+      <select id="projectSelect" class="form-select" [(ngModel)]="selectedProjectId" (ngModelChange)="reloadPages()">
+        @for (project of projects; track project.id) {
+          <option [ngValue]="project.id">{{ project.key }} · {{ project.name }}</option>
+        }
+      </select>
+    </div>
+  </section>
+
+  <section class="pages-grid">
+    <form class="page-form" (ngSubmit)="createPage()">
+      <h2 i18n>Page</h2>
+      <input class="form-control" name="pageTitle" [(ngModel)]="draft.title" placeholder="Title" i18n-placeholder />
+      <button class="btn btn-sm btn-outline-primary" type="submit" [disabled]="!selectedProjectId">
+        <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Create page</ng-container>
+      </button>
+    </form>
+    <div class="list-grid">
+      @for (page of pages; track page.id) {
+        <article class="list-card">
+          <i-bs name="journals"></i-bs>
+          <div>
+            <div class="fw-semibold">{{ page.title }}</div>
+            <div class="small text-muted">{{ page.updated_at }}</div>
+          </div>
+        </article>
+      }
+    </div>
+  </section>
+</div>

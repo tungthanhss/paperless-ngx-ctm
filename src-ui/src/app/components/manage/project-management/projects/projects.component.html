@@ -1,0 +1,38 @@
+<pngx-page-header title="Quản lý project" i18n-title [loading]="loading"></pngx-page-header>
+
+<div class="project-management">
+  <section class="pm-toolbar single">
+    <div class="selector">
+      <label class="form-label" for="workspaceSelect" i18n>Workspace</label>
+      <select id="workspaceSelect" class="form-select" [(ngModel)]="selectedWorkspaceId" (ngModelChange)="reloadProjects()">
+        @for (workspace of workspaces; track workspace.id) {
+          <option [ngValue]="workspace.id">{{ workspace.name }}</option>
+        }
+      </select>
+    </div>
+  </section>
+
+  <section class="form-band">
+    <form class="create-form" (ngSubmit)="createProject()">
+      <h2 i18n>Project</h2>
+      <input class="form-control" name="projectKey" [(ngModel)]="draft.key" placeholder="Key" i18n-placeholder />
+      <input class="form-control" name="projectName" [(ngModel)]="draft.name" placeholder="Name" i18n-placeholder />
+      <input class="form-control" name="projectDescription" [(ngModel)]="draft.description" placeholder="Description" i18n-placeholder />
+      <button class="btn btn-sm btn-outline-primary" type="submit" [disabled]="!selectedWorkspaceId">
+        <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Create</ng-container>
+      </button>
+    </form>
+  </section>
+
+  <section class="list-grid">
+    @for (project of projects; track project.id) {
+      <article class="list-card">
+        <i-bs name="diagram3"></i-bs>
+        <div>
+          <div class="fw-semibold">{{ project.key }} · {{ project.name }}</div>
+          <div class="small text-muted">{{ project.description }}</div>
+        </div>
+      </article>
+    }
+  </section>
+</div>

@@ -13,6 +13,15 @@ import { DocumentDetailComponent } from './components/document-detail/document-d
 import { DocumentListComponent } from './components/document-list/document-list.component'
 import { DocumentAttributesComponent } from './components/manage/document-attributes/document-attributes.component'
 import { MailComponent } from './components/manage/mail/mail.component'
+import { ProjectDashboardComponent } from './components/manage/project-management/dashboard/project-dashboard.component'
+import { ProjectIntakeComponent } from './components/manage/project-management/intake/intake.component'
+import { ProjectPagesComponent } from './components/manage/project-management/pages/pages.component'
+import { ProjectPlanningComponent } from './components/manage/project-management/planning/planning.component'
+import { ProjectManagementComponent } from './components/manage/project-management/project-management.component'
+import { ProjectsComponent } from './components/manage/project-management/projects/projects.component'
+import { StatesComponent } from './components/manage/project-management/states/states.component'
+import { ProjectTasksComponent } from './components/manage/project-management/tasks/tasks.component'
+import { WorkspacesComponent } from './components/manage/project-management/workspaces/workspaces.component'
 import { SavedViewsComponent } from './components/manage/saved-views/saved-views.component'
 import { WorkflowsComponent } from './components/manage/workflows/workflows.component'
 import { NotFoundComponent } from './components/not-found/not-found.component'
@@ -261,6 +270,65 @@ export const routes: Routes = [
         path: 'customfields',
         redirectTo: '/attributes/customfields',
         pathMatch: 'full',
+      },
+      {
+        path: 'projects',
+        redirectTo: '/work-management/projects',
+        pathMatch: 'full',
+      },
+      {
+        path: 'work-management',
+        component: ProjectManagementComponent,
+        data: {
+          componentName: 'ProjectManagementComponent',
+        },
+        children: [
+          {
+            path: '',
+            redirectTo: 'dashboard',
+            pathMatch: 'full',
+          },
+          {
+            path: 'dashboard',
+            component: ProjectDashboardComponent,
+            data: { componentName: 'ProjectDashboardComponent' },
+          },
+          {
+            path: 'workspaces',
+            component: WorkspacesComponent,
+            data: { componentName: 'WorkspacesComponent' },
+          },
+          {
+            path: 'projects',
+            component: ProjectsComponent,
+            data: { componentName: 'ProjectsComponent' },
+          },
+          {
+            path: 'states',
+            component: StatesComponent,
+            data: { componentName: 'StatesComponent' },
+          },
+          {
+            path: 'tasks',
+            component: ProjectTasksComponent,
+            data: { componentName: 'ProjectTasksComponent' },
+          },
+          {
+            path: 'planning',
+            component: ProjectPlanningComponent,
+            data: { componentName: 'ProjectPlanningComponent' },
+          },
+          {
+            path: 'intake',
+            component: ProjectIntakeComponent,
+            data: { componentName: 'ProjectIntakeComponent' },
+          },
+          {
+            path: 'pages',
+            component: ProjectPagesComponent,
+            data: { componentName: 'ProjectPagesComponent' },
+          },
+        ],
       },
       {
         path: 'workflows',

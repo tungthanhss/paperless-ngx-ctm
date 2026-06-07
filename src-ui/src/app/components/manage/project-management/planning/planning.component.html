@@ -1,0 +1,83 @@
+<pngx-page-header title="Kế hoạch công việc" i18n-title [loading]="loading"></pngx-page-header>
+
+<div class="project-management">
+  <section class="pm-toolbar">
+    <div class="selector">
+      <label class="form-label" for="workspaceSelect" i18n>Workspace</label>
+      <select id="workspaceSelect" class="form-select" [(ngModel)]="selectedWorkspaceId" (ngModelChange)="reloadProjects()">
+        @for (workspace of workspaces; track workspace.id) {
+          <option [ngValue]="workspace.id">{{ workspace.name }}</option>
+        }
+      </select>
+    </div>
+    <div class="selector">
+      <label class="form-label" for="projectSelect" i18n>Project</label>
+      <select id="projectSelect" class="form-select" [(ngModel)]="selectedProjectId" (ngModelChange)="reloadProjectData()">
+        @for (project of projects; track project.id) {
+          <option [ngValue]="project.id">{{ project.key }} · {{ project.name }}</option>
+        }
+      </select>
+    </div>
+  </section>
+
+  <section class="planning-grid">
+    <form class="planning-form" (ngSubmit)="createCycle()">
+      <h2 i18n>Cycle</h2>
+      <input class="form-control" name="cycleName" [(ngModel)]="cycleDraft.name" placeholder="Name" i18n-placeholder />
+      <input class="form-control" name="cycleStart" type="date" [(ngModel)]="cycleDraft.starts_at" />
+      <input class="form-control" name="cycleEnd" type="date" [(ngModel)]="cycleDraft.ends_at" />
+      <button class="btn btn-sm btn-outline-primary" type="submit" [disabled]="!selectedProjectId">
+        <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Create cycle</ng-container>
+      </button>
+    </form>
+    <form class="planning-form" (ngSubmit)="createModule()">
+      <h2 i18n>Module</h2>
+      <input class="form-control" name="moduleName" [(ngModel)]="moduleDraft.name" placeholder="Name" i18n-placeholder />
+      <input class="form-control" name="moduleTarget" type="date" [(ngModel)]="moduleDraft.target_date" />
+      <button class="btn btn-sm btn-outline-primary" type="submit" [disabled]="!selectedProjectId">
+        <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Create module</ng-container>
+      </button>
+    </form>
+
+    <div class="planning-list">
+      <h2 i18n>Cycles</h2>
+      @for (cycle of cycles; track cycle.id) {
+        <div class="planning-row">
+          <div>
+            <div class="fw-semibold">{{ cycle.name }}</div>
+            <div class="small text-muted">{{ cycle.starts_at }} - {{ cycle.ends_at }}</div>
+          </div>
+          <div class="progress mini-progress">
+            <div class="progress-bar" [style.width.%]="cycle.progress || 0"></div>
+          </div>
+          <select #nextCycle class="form-select form-select-sm">
+            <option value="" i18n>Next cycle</option>
+            @for (candidate of cycles; track candidate.id) {
+              @if (candidate.id !== cycle.id) {
+                <option [value]="candidate.id">{{ candidate.name }}</option>
+              }
+            }
+          </select>
+          <button class="btn btn-sm btn-outline-secondary" type="button" (click)="rolloverCycle(cycle, nextCycle.value)">
+            <i-bs name="arrow-repeat" class="me-1"></i-bs><ng-container i18n>Rollover</ng-container>
+          </button>
+        </div>
+      }
+    </div>
+
+    <div class="planning-list">
+      <h2 i18n>Modules</h2>
+      @for (module of modules; track module.id) {
+        <div class="planning-row">
+          <div>
+            <div class="fw-semibold">{{ module.name }}</div>
+            <div class="small text-muted">{{ module.target_date }}</div>
+          </div>
+          <div class="progress mini-progress">
+            <div class="progress-bar" [style.width.%]="module.progress || 0"></div>
+          </div>
+        </div>
+      }
+    </div>
+  </section>
+</div>

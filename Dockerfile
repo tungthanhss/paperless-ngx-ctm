@@ -7,12 +7,17 @@
 #  - Does PNPM stuff with Typescript and such
 FROM --platform=$BUILDPLATFORM docker.io/node:24-trixie-slim AS compile-frontend
 
-COPY ./src-ui /src/src-ui
-
 WORKDIR /src/src-ui
-RUN set -eux \
+
+COPY ./src-ui/package.json ./src-ui/pnpm-lock.yaml ./src-ui/.npmrc ./
+
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+  set -eux \
   && corepack enable \
-  && pnpm install
+  && pnpm config set store-dir /root/.local/share/pnpm/store \
+  && pnpm install --frozen-lockfile
+
+COPY ./src-ui /src/src-ui
 
 ARG PNGX_TAG_VERSION=
 # Add the tag to the environment file if its a tagged dev build
@@ -23,7 +28,8 @@ case "${PNGX_TAG_VERSION}" in \
     ;; \
 esac
 
-RUN set -eux \
+RUN --mount=type=cache,id=angular-cache,target=/src/src-ui/.angular/cache \
+  set -eux \
   && ./node_modules/.bin/ng build --configuration production
 
 # Stage: s6-overlay-base

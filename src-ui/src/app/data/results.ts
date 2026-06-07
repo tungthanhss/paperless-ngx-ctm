@@ -5,6 +5,10 @@ export interface Results<T> {
 
   display_count?: number
 
+  next?: string
+
+  previous?: string
+
   results: T[]
 }
 

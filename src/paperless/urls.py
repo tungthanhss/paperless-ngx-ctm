@@ -26,9 +26,17 @@ from documents.views import DocumentTypeViewSet
 from documents.views import EditPdfDocumentsView
 from documents.views import GlobalSearchView
 from documents.views import IndexView
+from documents.views import IntakeRequestViewSet
 from documents.views import LogViewSet
 from documents.views import MergeDocumentsView
 from documents.views import PostDocumentView
+from documents.views import ProjectCycleViewSet
+from documents.views import ProjectIssueViewSet
+from documents.views import ProjectLabelViewSet
+from documents.views import ProjectModuleViewSet
+from documents.views import ProjectPageViewSet
+from documents.views import ProjectStateViewSet
+from documents.views import ProjectViewSet
 from documents.views import RemoteVersionView
 from documents.views import RemovePasswordDocumentsView
 from documents.views import ReprocessDocumentsView
@@ -50,6 +58,7 @@ from documents.views import UnifiedSearchViewSet
 from documents.views import WorkflowActionViewSet
 from documents.views import WorkflowTriggerViewSet
 from documents.views import WorkflowViewSet
+from documents.views import WorkspaceViewSet
 from documents.views import serve_logo
 from paperless.consumers import StatusConsumer
 from paperless.views import ApplicationConfigurationViewSet
@@ -88,6 +97,23 @@ api_router.register(r"workflows", WorkflowViewSet)
 api_router.register(r"custom_fields", CustomFieldViewSet)
 api_router.register(r"config", ApplicationConfigurationViewSet)
 api_router.register(r"processed_mail", ProcessedMailViewSet)
+api_router.register(r"workspaces", WorkspaceViewSet, basename="workspaces")
+api_router.register(r"projects", ProjectViewSet, basename="projects")
+api_router.register(r"project_states", ProjectStateViewSet, basename="project_states")
+api_router.register(r"project_labels", ProjectLabelViewSet, basename="project_labels")
+api_router.register(r"project_cycles", ProjectCycleViewSet, basename="project_cycles")
+api_router.register(
+    r"project_modules",
+    ProjectModuleViewSet,
+    basename="project_modules",
+)
+api_router.register(r"project_issues", ProjectIssueViewSet, basename="project_issues")
+api_router.register(
+    r"intake_requests",
+    IntakeRequestViewSet,
+    basename="intake_requests",
+)
+api_router.register(r"project_pages", ProjectPageViewSet, basename="project_pages")
 
 
 urlpatterns = [

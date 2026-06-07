@@ -61,9 +61,17 @@ from documents.models import CustomField
 from documents.models import CustomFieldInstance
 from documents.models import Document
 from documents.models import DocumentType
+from documents.models import IntakeRequest
 from documents.models import MatchingModel
 from documents.models import Note
 from documents.models import PaperlessTask
+from documents.models import Project
+from documents.models import ProjectCycle
+from documents.models import ProjectIssue
+from documents.models import ProjectLabel
+from documents.models import ProjectModule
+from documents.models import ProjectPage
+from documents.models import ProjectState
 from documents.models import SavedView
 from documents.models import SavedViewFilterRule
 from documents.models import ShareLink
@@ -76,6 +84,7 @@ from documents.models import WorkflowAction
 from documents.models import WorkflowActionEmail
 from documents.models import WorkflowActionWebhook
 from documents.models import WorkflowTrigger
+from documents.models import Workspace
 from documents.parsers import is_mime_type_supported
 from documents.permissions import get_document_count_filter_for_user
 from documents.permissions import get_groups_with_only_permission
@@ -3386,6 +3395,311 @@ class WorkflowSerializer(serializers.ModelSerializer[Workflow]):
         self.prune_triggers_and_actions()
 
         return instance
+
+
+class WorkspaceSerializer(serializers.ModelSerializer[Workspace]):
+    owner_username = serializers.CharField(source="owner.username", read_only=True)
+
+    class Meta:
+        model = Workspace
+        fields = [
+            "id",
+            "name",
+            "description",
+            "owner",
+            "owner_username",
+            "members",
+            "settings",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "owner", "owner_username", "created_at", "updated_at"]
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Workspace name is required.")
+        return value
+
+
+class ProjectSerializer(serializers.ModelSerializer[Project]):
+    workspace_name = serializers.CharField(source="workspace.name", read_only=True)
+    lead_username = serializers.CharField(source="lead.username", read_only=True)
+
+    class Meta:
+        model = Project
+        fields = [
+            "id",
+            "workspace",
+            "workspace_name",
+            "name",
+            "key",
+            "description",
+            "owner",
+            "lead",
+            "lead_username",
+            "members",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "owner",
+            "workspace_name",
+            "lead_username",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_key(self, value):
+        value = value.strip().upper()
+        if not value:
+            raise serializers.ValidationError("Project key is required.")
+        if not re.match(r"^[A-Z0-9][A-Z0-9_-]{0,15}$", value):
+            raise serializers.ValidationError(
+                "Use 1-16 uppercase letters, numbers, underscores, or hyphens.",
+            )
+        return value
+
+
+class ProjectStateSerializer(serializers.ModelSerializer[ProjectState]):
+    class Meta:
+        model = ProjectState
+        fields = ["id", "project", "name", "position", "is_default", "is_completed"]
+        read_only_fields = ["id"]
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("State name is required.")
+        return value
+
+
+class ProjectLabelSerializer(serializers.ModelSerializer[ProjectLabel]):
+    class Meta:
+        model = ProjectLabel
+        fields = ["id", "project", "name", "color"]
+        read_only_fields = ["id"]
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Label name is required.")
+        return value
+
+    def validate_color(self, value):
+        if not re.match(r"^#[0-9a-fA-F]{6}$", value):
+            raise serializers.ValidationError("Use a #RRGGBB color.")
+        return value
+
+
+class ProjectCycleSerializer(serializers.ModelSerializer[ProjectCycle]):
+    completed_issues = serializers.SerializerMethodField()
+    total_issues = serializers.SerializerMethodField()
+    progress = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectCycle
+        fields = [
+            "id",
+            "project",
+            "name",
+            "starts_at",
+            "ends_at",
+            "is_active",
+            "completed_issues",
+            "total_issues",
+            "progress",
+        ]
+        read_only_fields = ["id", "completed_issues", "total_issues", "progress"]
+
+    def validate(self, attrs):
+        starts_at = attrs.get("starts_at", getattr(self.instance, "starts_at", None))
+        ends_at = attrs.get("ends_at", getattr(self.instance, "ends_at", None))
+        if starts_at and ends_at and starts_at > ends_at:
+            raise serializers.ValidationError(
+                {"ends_at": "End date must be on or after start date."},
+            )
+        return attrs
+
+    def get_completed_issues(self, obj) -> int:
+        return obj.issues.filter(state__is_completed=True).count()
+
+    def get_total_issues(self, obj) -> int:
+        return obj.issues.count()
+
+    def get_progress(self, obj) -> float:
+        total = self.get_total_issues(obj)
+        if total == 0:
+            return 0
+        return round(self.get_completed_issues(obj) / total * 100, 2)
+
+
+class ProjectModuleSerializer(serializers.ModelSerializer[ProjectModule]):
+    completed_issues = serializers.SerializerMethodField()
+    total_issues = serializers.SerializerMethodField()
+    progress = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectModule
+        fields = [
+            "id",
+            "project",
+            "name",
+            "description",
+            "target_date",
+            "completed_issues",
+            "total_issues",
+            "progress",
+        ]
+        read_only_fields = ["id", "completed_issues", "total_issues", "progress"]
+
+    def get_completed_issues(self, obj) -> int:
+        return obj.issues.filter(state__is_completed=True).count()
+
+    def get_total_issues(self, obj) -> int:
+        return obj.issues.count()
+
+    def get_progress(self, obj) -> float:
+        total = self.get_total_issues(obj)
+        if total == 0:
+            return 0
+        return round(self.get_completed_issues(obj) / total * 100, 2)
+
+
+class ProjectIssueSerializer(serializers.ModelSerializer[ProjectIssue]):
+    assignee_username = serializers.CharField(
+        source="assignee.username",
+        read_only=True,
+    )
+    created_by_username = serializers.CharField(
+        source="created_by.username",
+        read_only=True,
+    )
+    state_name = serializers.CharField(source="state.name", read_only=True)
+
+    class Meta:
+        model = ProjectIssue
+        fields = [
+            "id",
+            "project",
+            "title",
+            "description",
+            "assignee",
+            "assignee_username",
+            "created_by",
+            "created_by_username",
+            "state",
+            "state_name",
+            "priority",
+            "labels",
+            "cycle",
+            "module",
+            "estimate",
+            "due_date",
+            "completed_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "created_by",
+            "assignee_username",
+            "created_by_username",
+            "state_name",
+            "completed_at",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_title(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Issue title is required.")
+        return value
+
+    def validate(self, attrs):
+        project = attrs.get("project", getattr(self.instance, "project", None))
+        for field_name in ["state", "cycle", "module"]:
+            related = attrs.get(field_name, getattr(self.instance, field_name, None))
+            if related is not None and related.project_id != project.id:
+                raise serializers.ValidationError(
+                    {field_name: "Selected object must belong to the issue project."},
+                )
+        labels = attrs.get("labels")
+        if labels is not None and any(
+            label.project_id != project.id for label in labels
+        ):
+            raise serializers.ValidationError(
+                {"labels": "All labels must belong to the issue project."},
+            )
+        return attrs
+
+
+class IntakeRequestSerializer(serializers.ModelSerializer[IntakeRequest]):
+    requester_username = serializers.CharField(
+        source="requester.username",
+        read_only=True,
+    )
+
+    class Meta:
+        model = IntakeRequest
+        fields = [
+            "id",
+            "project",
+            "title",
+            "description",
+            "requester",
+            "requester_username",
+            "source_department",
+            "status",
+            "review_comment",
+            "accepted_issue",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "requester",
+            "requester_username",
+            "status",
+            "accepted_issue",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_title(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Request title is required.")
+        return value
+
+
+class ProjectPageSerializer(serializers.ModelSerializer[ProjectPage]):
+    created_by_username = serializers.CharField(
+        source="created_by.username",
+        read_only=True,
+    )
+
+    class Meta:
+        model = ProjectPage
+        fields = [
+            "id",
+            "project",
+            "title",
+            "content",
+            "created_by",
+            "created_by_username",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "created_by",
+            "created_by_username",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class TrashSerializer(SerializerWithPerms):

@@ -112,7 +112,8 @@
 			},
 			"options": {
 				"cwd": "${workspaceFolder}/src"
-			}
+			},
+			"problemMatcher": []
 		},
 		{
 			"label": "Maintenance: Build Documentation",

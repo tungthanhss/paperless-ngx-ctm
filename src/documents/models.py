@@ -1894,3 +1894,370 @@ class WorkflowRun(SoftDeleteModel):
 
     def __str__(self) -> str:
         return f"WorkflowRun of {self.workflow} at {self.run_at} on {self.document}"
+
+
+class Workspace(ModelWithOwner):
+    name = models.CharField(_("name"), max_length=255)
+    description = models.TextField(_("description"), blank=True)
+    members = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name="department_workspaces",
+        verbose_name=_("members"),
+    )
+    settings = models.JSONField(_("settings"), default=dict, blank=True)
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("workspace")
+        verbose_name_plural = _("workspaces")
+        ordering = ("name",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "owner"],
+                name="documents_workspace_unique_name_owner",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class Project(ModelWithOwner):
+    workspace = models.ForeignKey(
+        Workspace,
+        on_delete=models.CASCADE,
+        related_name="projects",
+        verbose_name=_("workspace"),
+    )
+    name = models.CharField(_("name"), max_length=255)
+    key = models.CharField(_("key"), max_length=16)
+    description = models.TextField(_("description"), blank=True)
+    lead = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="led_department_projects",
+        verbose_name=_("lead"),
+    )
+    members = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name="department_projects",
+        verbose_name=_("members"),
+    )
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("project")
+        verbose_name_plural = _("projects")
+        ordering = ("workspace__name", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workspace", "key"],
+                name="documents_project_unique_key_workspace",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["workspace", "key"]),
+            models.Index(fields=["owner", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.key}: {self.name}"
+
+
+class ProjectState(models.Model):
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="states",
+        verbose_name=_("project"),
+    )
+    name = models.CharField(_("name"), max_length=128)
+    position = models.PositiveIntegerField(_("position"), default=0)
+    is_default = models.BooleanField(_("is default"), default=False)
+    is_completed = models.BooleanField(_("is completed"), default=False)
+
+    class Meta:
+        verbose_name = _("project state")
+        verbose_name_plural = _("project states")
+        ordering = ("project", "position", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "name"],
+                name="documents_projectstate_unique_name_project",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.project.key}: {self.name}"
+
+
+class ProjectLabel(models.Model):
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="labels",
+        verbose_name=_("project"),
+    )
+    name = models.CharField(_("name"), max_length=128)
+    color = models.CharField(_("color"), max_length=7, default="#6b7280")
+
+    class Meta:
+        verbose_name = _("project label")
+        verbose_name_plural = _("project labels")
+        ordering = ("project", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "name"],
+                name="documents_projectlabel_unique_name_project",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.project.key}: {self.name}"
+
+
+class ProjectCycle(models.Model):
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="cycles",
+        verbose_name=_("project"),
+    )
+    name = models.CharField(_("name"), max_length=255)
+    starts_at = models.DateField(_("starts at"))
+    ends_at = models.DateField(_("ends at"))
+    is_active = models.BooleanField(_("is active"), default=True)
+
+    class Meta:
+        verbose_name = _("project cycle")
+        verbose_name_plural = _("project cycles")
+        ordering = ("-starts_at", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "name"],
+                name="documents_projectcycle_unique_name_project",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.project.key}: {self.name}"
+
+
+class ProjectModule(models.Model):
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="modules",
+        verbose_name=_("project"),
+    )
+    name = models.CharField(_("name"), max_length=255)
+    description = models.TextField(_("description"), blank=True)
+    target_date = models.DateField(_("target date"), blank=True, null=True)
+
+    class Meta:
+        verbose_name = _("project module")
+        verbose_name_plural = _("project modules")
+        ordering = ("project", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "name"],
+                name="documents_projectmodule_unique_name_project",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.project.key}: {self.name}"
+
+
+class ProjectIssue(models.Model):
+    class Priority(models.TextChoices):
+        URGENT = "urgent", _("Urgent")
+        HIGH = "high", _("High")
+        MEDIUM = "medium", _("Medium")
+        LOW = "low", _("Low")
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="issues",
+        verbose_name=_("project"),
+    )
+    title = models.CharField(_("title"), max_length=255)
+    description = models.TextField(_("description"), blank=True)
+    assignee = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="assigned_project_issues",
+        verbose_name=_("assignee"),
+    )
+    created_by = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="created_project_issues",
+        verbose_name=_("created by"),
+    )
+    state = models.ForeignKey(
+        ProjectState,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="issues",
+        verbose_name=_("state"),
+    )
+    priority = models.CharField(
+        _("priority"),
+        max_length=16,
+        choices=Priority.choices,
+        default=Priority.MEDIUM,
+    )
+    labels = models.ManyToManyField(
+        ProjectLabel,
+        blank=True,
+        related_name="issues",
+        verbose_name=_("labels"),
+    )
+    cycle = models.ForeignKey(
+        ProjectCycle,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="issues",
+        verbose_name=_("cycle"),
+    )
+    module = models.ForeignKey(
+        ProjectModule,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="issues",
+        verbose_name=_("module"),
+    )
+    estimate = models.PositiveIntegerField(_("estimate"), default=0)
+    due_date = models.DateField(_("due date"), blank=True, null=True)
+    completed_at = models.DateTimeField(_("completed at"), blank=True, null=True)
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("project issue")
+        verbose_name_plural = _("project issues")
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["project", "state"]),
+            models.Index(fields=["assignee", "created_at"]),
+            models.Index(fields=["cycle", "created_at"]),
+            models.Index(fields=["module", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.project.key}: {self.title}"
+
+    def save(self, *args, **kwargs) -> None:
+        if self.state and self.state.is_completed and self.completed_at is None:
+            self.completed_at = timezone.now()
+        elif self.state and not self.state.is_completed:
+            self.completed_at = None
+        super().save(*args, **kwargs)
+
+
+class IntakeRequest(models.Model):
+    class Status(models.TextChoices):
+        OPEN = "open", _("Open")
+        ACCEPTED = "accepted", _("Accepted")
+        DECLINED = "declined", _("Declined")
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="intake_requests",
+        verbose_name=_("project"),
+    )
+    title = models.CharField(_("title"), max_length=255)
+    description = models.TextField(_("description"), blank=True)
+    requester = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="submitted_intake_requests",
+        verbose_name=_("requester"),
+    )
+    source_department = models.CharField(
+        _("source department"),
+        max_length=255,
+        blank=True,
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=16,
+        choices=Status.choices,
+        default=Status.OPEN,
+    )
+    review_comment = models.TextField(_("review comment"), blank=True)
+    accepted_issue = models.OneToOneField(
+        ProjectIssue,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="intake_request",
+        verbose_name=_("accepted issue"),
+    )
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("intake request")
+        verbose_name_plural = _("intake requests")
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["project", "status"]),
+            models.Index(fields=["requester", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.project.key}: {self.title}"
+
+
+class ProjectPage(models.Model):
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="pages",
+        verbose_name=_("project"),
+    )
+    title = models.CharField(_("title"), max_length=255)
+    content = models.JSONField(_("content"), default=list, blank=True)
+    created_by = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="created_project_pages",
+        verbose_name=_("created by"),
+    )
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("project page")
+        verbose_name_plural = _("project pages")
+        ordering = ("project", "title")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "title"],
+                name="documents_projectpage_unique_title_project",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.project.key}: {self.title}"
