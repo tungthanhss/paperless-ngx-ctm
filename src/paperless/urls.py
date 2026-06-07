@@ -35,7 +35,7 @@ from documents.views import ProjectIssueViewSet
 from documents.views import ProjectLabelViewSet
 from documents.views import ProjectModuleViewSet
 from documents.views import ProjectPageViewSet
-from documents.views import ProjectStateViewSet
+from documents.views import ProjectSubTaskViewSet
 from documents.views import ProjectViewSet
 from documents.views import RemoteVersionView
 from documents.views import RemovePasswordDocumentsView
@@ -99,7 +99,6 @@ api_router.register(r"config", ApplicationConfigurationViewSet)
 api_router.register(r"processed_mail", ProcessedMailViewSet)
 api_router.register(r"workspaces", WorkspaceViewSet, basename="workspaces")
 api_router.register(r"projects", ProjectViewSet, basename="projects")
-api_router.register(r"project_states", ProjectStateViewSet, basename="project_states")
 api_router.register(r"project_labels", ProjectLabelViewSet, basename="project_labels")
 api_router.register(r"project_cycles", ProjectCycleViewSet, basename="project_cycles")
 api_router.register(
@@ -108,6 +107,11 @@ api_router.register(
     basename="project_modules",
 )
 api_router.register(r"project_issues", ProjectIssueViewSet, basename="project_issues")
+api_router.register(
+    r"project_subtasks",
+    ProjectSubTaskViewSet,
+    basename="project_subtasks",
+)
 api_router.register(
     r"intake_requests",
     IntakeRequestViewSet,

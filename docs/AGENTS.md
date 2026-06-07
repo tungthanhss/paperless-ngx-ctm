@@ -12,6 +12,9 @@ File nay dung de ghi huong dan lam viec cho AI/coding agent khi thao tac trong t
 
 - Khong sua noi dung ngoai pham vi yeu cau.
 - Không cần viết unit test khi viết code
+- Xong phần nào cần update lại document phần đó
+- Code xong bỏ qua bước kiểm tra lint cho frontend
+- luôn kiểm tra fe bằng lệnh duy nhất ng build --configuration development
 
 ## Lenh thuong dung
 

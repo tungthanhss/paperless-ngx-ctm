@@ -73,12 +73,34 @@ export interface ProjectTask extends ObjectWithId {
   start_date?: string
   due_date?: string
   completed_at?: string
+  subtasks_total?: number
+  subtasks_completed?: number
+  subtasks_progress?: number
   created_at?: string
   updated_at?: string
 }
 
 export type ProjectIssuePriority = ProjectTaskPriority
 export type ProjectIssue = ProjectTask
+
+export interface ProjectSubTask extends ObjectWithId {
+  task: number
+  title: string
+  description: string
+  assignee?: number
+  assignee_username?: string
+  created_by?: number
+  created_by_username?: string
+  status: ProjectTaskStatus
+  status_display?: string
+  start_date?: string
+  due_date?: string
+  estimate: number
+  position: number
+  completed_at?: string
+  created_at?: string
+  updated_at?: string
+}
 
 export type IntakeRequestStatus = 'open' | 'accepted' | 'declined'
 

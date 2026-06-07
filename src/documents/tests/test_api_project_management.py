@@ -9,7 +9,7 @@ from documents.models import IntakeRequest
 from documents.models import ProjectCycle
 from documents.models import ProjectIssue
 from documents.models import ProjectLabel
-from documents.models import ProjectState
+from documents.models import ProjectSubTask
 from documents.models import Workspace
 
 pytestmark = pytest.mark.api
@@ -95,17 +95,6 @@ class TestProjectManagementApi:
     ) -> None:
         project = self._create_project(admin_client)
         User.objects.create_user(username="alex")
-        state_response = admin_client.post(
-            "/api/project_states/",
-            {
-                "project": project["id"],
-                "name": "Backlog",
-                "position": 0,
-                "is_default": True,
-            },
-            format="json",
-        )
-        assert state_response.status_code == status.HTTP_201_CREATED
 
         response = admin_client.post(
             "/api/project_issues/quick_add/",
@@ -116,8 +105,83 @@ class TestProjectManagementApi:
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["title"] == "Reset laptop access"
         assert response.data["assignee_username"] == "alex"
-        assert response.data["state_name"] == "Backlog"
+        assert response.data["status"] == ProjectIssue.Status.OPEN
         assert ProjectLabel.objects.get(project_id=project["id"], name="it")
+
+    def test_create_issue_accepts_start_date_and_assignee(
+        self,
+        admin_client: APIClient,
+    ) -> None:
+        project = self._create_project(admin_client)
+        assignee = User.objects.create_user(username="casey")
+
+        response = admin_client.post(
+            "/api/project_issues/",
+            {
+                "project": project["id"],
+                "title": "Prepare onboarding checklist",
+                "assignee": assignee.id,
+                "start_date": "2026-06-07",
+                "due_date": "2026-06-14",
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data["assignee"] == assignee.id
+        assert response.data["assignee_username"] == "casey"
+        assert response.data["start_date"] == "2026-06-07"
+
+    def test_create_subtasks_and_report_task_progress(
+        self,
+        admin_client: APIClient,
+        admin_user: User,
+    ) -> None:
+        project = self._create_project(admin_client)
+        task = ProjectIssue.objects.create(
+            project_id=project["id"],
+            title="Prepare onboarding",
+            created_by=admin_user,
+        )
+
+        first_response = admin_client.post(
+            "/api/project_subtasks/",
+            {
+                "task": task.id,
+                "title": "Create checklist",
+                "position": 1,
+            },
+            format="json",
+        )
+        second_response = admin_client.post(
+            "/api/project_subtasks/",
+            {
+                "task": task.id,
+                "title": "Invite employee",
+                "position": 2,
+            },
+            format="json",
+        )
+
+        assert first_response.status_code == status.HTTP_201_CREATED
+        assert first_response.data["created_by"] == admin_user.id
+        assert first_response.data["status"] == ProjectIssue.Status.OPEN
+        assert second_response.status_code == status.HTTP_201_CREATED
+
+        complete_response = admin_client.patch(
+            f"/api/project_subtasks/{first_response.data['id']}/",
+            {"status": ProjectIssue.Status.COMPLETED},
+            format="json",
+        )
+        assert complete_response.status_code == status.HTTP_200_OK
+        assert complete_response.data["completed_at"]
+        assert ProjectSubTask.objects.filter(task=task).count() == 2
+
+        task_response = admin_client.get(f"/api/project_issues/{task.id}/")
+        assert task_response.status_code == status.HTTP_200_OK
+        assert task_response.data["subtasks_total"] == 2
+        assert task_response.data["subtasks_completed"] == 1
+        assert task_response.data["subtasks_progress"] == 50
 
     def test_accept_intake_request_creates_issue(
         self,
@@ -152,16 +216,6 @@ class TestProjectManagementApi:
         admin_client: APIClient,
     ) -> None:
         project = self._create_project(admin_client)
-        backlog = ProjectState.objects.create(
-            project_id=project["id"],
-            name="Backlog",
-            is_default=True,
-        )
-        done = ProjectState.objects.create(
-            project_id=project["id"],
-            name="Done",
-            is_completed=True,
-        )
         current = ProjectCycle.objects.create(
             project_id=project["id"],
             name="Week 1",
@@ -177,13 +231,13 @@ class TestProjectManagementApi:
         incomplete = ProjectIssue.objects.create(
             project_id=project["id"],
             title="Open task",
-            state=backlog,
+            status=ProjectIssue.Status.OPEN,
             cycle=current,
         )
         completed = ProjectIssue.objects.create(
             project_id=project["id"],
             title="Done task",
-            state=done,
+            status=ProjectIssue.Status.COMPLETED,
             cycle=current,
         )
 

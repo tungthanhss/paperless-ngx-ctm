@@ -71,7 +71,7 @@ from documents.models import ProjectIssue
 from documents.models import ProjectLabel
 from documents.models import ProjectModule
 from documents.models import ProjectPage
-from documents.models import ProjectState
+from documents.models import ProjectSubTask
 from documents.models import SavedView
 from documents.models import SavedViewFilterRule
 from documents.models import ShareLink
@@ -3462,19 +3462,6 @@ class ProjectSerializer(serializers.ModelSerializer[Project]):
         return value
 
 
-class ProjectStateSerializer(serializers.ModelSerializer[ProjectState]):
-    class Meta:
-        model = ProjectState
-        fields = ["id", "project", "name", "position", "is_default", "is_completed"]
-        read_only_fields = ["id"]
-
-    def validate_name(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("State name is required.")
-        return value
-
-
 class ProjectLabelSerializer(serializers.ModelSerializer[ProjectLabel]):
     class Meta:
         model = ProjectLabel
@@ -3523,7 +3510,7 @@ class ProjectCycleSerializer(serializers.ModelSerializer[ProjectCycle]):
         return attrs
 
     def get_completed_issues(self, obj) -> int:
-        return obj.issues.filter(state__is_completed=True).count()
+        return obj.issues.filter(status=ProjectIssue.Status.COMPLETED).count()
 
     def get_total_issues(self, obj) -> int:
         return obj.issues.count()
@@ -3555,7 +3542,7 @@ class ProjectModuleSerializer(serializers.ModelSerializer[ProjectModule]):
         read_only_fields = ["id", "completed_issues", "total_issues", "progress"]
 
     def get_completed_issues(self, obj) -> int:
-        return obj.issues.filter(state__is_completed=True).count()
+        return obj.issues.filter(status=ProjectIssue.Status.COMPLETED).count()
 
     def get_total_issues(self, obj) -> int:
         return obj.issues.count()
@@ -3576,7 +3563,10 @@ class ProjectIssueSerializer(serializers.ModelSerializer[ProjectIssue]):
         source="created_by.username",
         read_only=True,
     )
-    state_name = serializers.CharField(source="state.name", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    subtasks_total = serializers.SerializerMethodField()
+    subtasks_completed = serializers.SerializerMethodField()
+    subtasks_progress = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectIssue
@@ -3589,15 +3579,19 @@ class ProjectIssueSerializer(serializers.ModelSerializer[ProjectIssue]):
             "assignee_username",
             "created_by",
             "created_by_username",
-            "state",
-            "state_name",
+            "status",
+            "status_display",
             "priority",
             "labels",
             "cycle",
             "module",
             "estimate",
+            "start_date",
             "due_date",
             "completed_at",
+            "subtasks_total",
+            "subtasks_completed",
+            "subtasks_progress",
             "created_at",
             "updated_at",
         ]
@@ -3606,8 +3600,11 @@ class ProjectIssueSerializer(serializers.ModelSerializer[ProjectIssue]):
             "created_by",
             "assignee_username",
             "created_by_username",
-            "state_name",
+            "status_display",
             "completed_at",
+            "subtasks_total",
+            "subtasks_completed",
+            "subtasks_progress",
             "created_at",
             "updated_at",
         ]
@@ -3620,7 +3617,7 @@ class ProjectIssueSerializer(serializers.ModelSerializer[ProjectIssue]):
 
     def validate(self, attrs):
         project = attrs.get("project", getattr(self.instance, "project", None))
-        for field_name in ["state", "cycle", "module"]:
+        for field_name in ["cycle", "module"]:
             related = attrs.get(field_name, getattr(self.instance, field_name, None))
             if related is not None and related.project_id != project.id:
                 raise serializers.ValidationError(
@@ -3634,6 +3631,68 @@ class ProjectIssueSerializer(serializers.ModelSerializer[ProjectIssue]):
                 {"labels": "All labels must belong to the issue project."},
             )
         return attrs
+
+    def get_subtasks_total(self, obj) -> int:
+        return obj.subtasks.count()
+
+    def get_subtasks_completed(self, obj) -> int:
+        return obj.subtasks.filter(status=ProjectIssue.Status.COMPLETED).count()
+
+    def get_subtasks_progress(self, obj) -> int:
+        total = self.get_subtasks_total(obj)
+        if total == 0:
+            return 0
+        return round(self.get_subtasks_completed(obj) / total * 100)
+
+
+class ProjectSubTaskSerializer(serializers.ModelSerializer[ProjectSubTask]):
+    assignee_username = serializers.CharField(
+        source="assignee.username",
+        read_only=True,
+    )
+    created_by_username = serializers.CharField(
+        source="created_by.username",
+        read_only=True,
+    )
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = ProjectSubTask
+        fields = [
+            "id",
+            "task",
+            "title",
+            "description",
+            "assignee",
+            "assignee_username",
+            "created_by",
+            "created_by_username",
+            "status",
+            "status_display",
+            "start_date",
+            "due_date",
+            "estimate",
+            "position",
+            "completed_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "created_by",
+            "assignee_username",
+            "created_by_username",
+            "status_display",
+            "completed_at",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_title(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Subtask title is required.")
+        return value
 
 
 class IntakeRequestSerializer(serializers.ModelSerializer[IntakeRequest]):

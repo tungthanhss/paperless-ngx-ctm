@@ -8,17 +8,18 @@ chu kỳ làm việc, module và ghi chú dự án ngay trong hệ thống.
 
 Mỗi workspace đại diện cho một không gian làm việc chung, ví dụ một phòng ban
 hoặc một nhóm vận hành. Bên trong workspace có nhiều project. Mỗi project có
-workflow riêng, nhãn riêng, chu kỳ riêng, module riêng và danh sách task riêng.
+nhãn riêng, chu kỳ riêng, module riêng, danh sách task riêng và subtask nằm
+trong từng task.
 
 Luồng sử dụng cơ bản:
 
 1. Tạo workspace.
 2. Tạo project trong workspace.
-3. Tạo các state cho workflow của project, ví dụ `Backlog`, `In Progress`,
-   `Review`, `Done`.
-4. Đặt một state làm mặc định để task mới tự động đi vào state đó.
-5. Tạo task bằng form thông thường hoặc ô quick add.
-6. Theo dõi tiến độ bằng board, list, cycle, module và intake request.
+3. Tạo task bằng form thông thường hoặc ô quick add.
+4. Cập nhật trạng thái task bằng bốn trạng thái cố định: `open`, `completed`,
+   `in_progress`, `cancel`.
+5. Chia nhỏ task bằng subtask khi cần checklist thực thi.
+6. Theo dõi tiến độ bằng list, cycle, module và intake request.
 
 ## Truy cập giao diện
 
@@ -32,12 +33,10 @@ Các màn hình hiện có:
   mở, task quá hạn và intake request đang mở.
 - **Workspace**: tạo và xem danh sách workspace.
 - **Project**: tạo và xem project theo workspace.
-- **Workflow state**: tạo state, đánh dấu state mặc định và state hoàn tất.
-- **Task**: quick add task, xem board/list, chuyển task giữa các state và chỉnh
-  priority.
+- **Task**: tạo task, gán người thực hiện, chọn ngày bắt đầu, nhãn, xem list,
+  đổi trạng thái cố định, chỉnh priority và quản lý subtask trong modal task.
 - **Kế hoạch**: quản lý cycle, module và rollover task giữa các cycle.
 - **Intake**: tạo, accept hoặc decline intake request.
-- **Pages**: tạo và xem page thuộc project.
 
 ## Mô hình dữ liệu
 
@@ -57,7 +56,7 @@ Người tạo workspace được tự động thêm vào `members`.
 
 ### Project
 
-Project thuộc một workspace và là nơi chứa workflow, task, planning và intake.
+Project thuộc một workspace và là nơi chứa task, planning và intake.
 
 Trường chính:
 
@@ -71,23 +70,6 @@ Trường chính:
 
 `key` phải dài từ 1 đến 16 ký tự và chỉ dùng chữ hoa, số, dấu gạch dưới hoặc dấu
 gạch ngang. Mỗi workspace không được có hai project trùng `key`.
-
-### Project State
-
-State định nghĩa các bước trong workflow của project.
-
-Trường chính:
-
-- `name`: tên state.
-- `position`: thứ tự hiển thị trên board.
-- `is_default`: state mặc định cho task mới.
-- `is_completed`: state được tính là hoàn tất.
-
-Trong một project chỉ có một state mặc định. Khi đặt state mới là mặc định, các
-state còn lại trong cùng project sẽ được bỏ cờ `is_default`.
-
-Khi task được chuyển vào state có `is_completed = true`, hệ thống tự gán
-`completed_at`. Khi task rời khỏi state hoàn tất, `completed_at` được xóa.
 
 ### Project Label
 
@@ -110,17 +92,47 @@ Trường chính:
 - `description`: mô tả.
 - `assignee`: người phụ trách.
 - `created_by`: người tạo.
-- `state`: trạng thái hiện tại.
+- `status`: trạng thái hiện tại, chỉ gồm `open`, `completed`, `in_progress`
+  hoặc `cancel`.
 - `priority`: `urgent`, `high`, `medium` hoặc `low`.
 - `labels`: các label của task.
 - `cycle`: cycle chứa task.
 - `module`: module chứa task.
 - `estimate`: ước lượng công việc.
+- `start_date`: ngày bắt đầu.
 - `due_date`: hạn xử lý.
 - `completed_at`: thời điểm hoàn tất.
+- `subtasks_total`: số subtask của task.
+- `subtasks_completed`: số subtask đã hoàn tất.
+- `subtasks_progress`: phần trăm hoàn tất subtask.
 
-Các liên kết `state`, `cycle`, `module` và `labels` phải thuộc cùng project với
-task.
+Các liên kết `cycle`, `module` và `labels` phải thuộc cùng project với task.
+Khi task chuyển sang `completed`, hệ thống tự gán `completed_at`. Khi task rời
+khỏi `completed`, `completed_at` được xóa.
+
+### Project Subtask
+
+Subtask là checklist công việc nhỏ nằm trong một task cha. Subtask dùng để chia
+nhỏ việc thực thi nhưng không có cycle, module hoặc label riêng.
+
+Trường chính:
+
+- `task`: task cha.
+- `title`: tiêu đề subtask.
+- `description`: mô tả.
+- `assignee`: người phụ trách subtask.
+- `created_by`: người tạo subtask.
+- `status`: trạng thái hiện tại, dùng cùng bộ giá trị với task: `open`,
+  `completed`, `in_progress`, `cancel`.
+- `start_date`: ngày bắt đầu.
+- `due_date`: hạn xử lý.
+- `estimate`: ước lượng công việc.
+- `position`: thứ tự hiển thị trong task.
+- `completed_at`: thời điểm hoàn tất.
+
+Khi subtask chuyển sang `completed`, hệ thống tự gán `completed_at`. Khi subtask
+rời khỏi `completed`, `completed_at` được xóa. Xóa task cha sẽ xóa toàn bộ
+subtask bên dưới task đó.
 
 ### Project Cycle
 
@@ -140,7 +152,7 @@ Trường chính:
 `ends_at` phải lớn hơn hoặc bằng `starts_at`.
 
 Cycle có thao tác `rollover` để chuyển các task chưa hoàn tất sang cycle tiếp
-theo. Task đã nằm trong state hoàn tất sẽ ở lại cycle cũ, và cycle cũ được đặt
+theo. Task có status `completed` sẽ ở lại cycle cũ, và cycle cũ được đặt
 `is_active = false`.
 
 ### Project Module
@@ -173,8 +185,8 @@ Trường chính:
 - `accepted_issue`: task được tạo khi yêu cầu được chấp nhận.
 
 Chỉ request ở trạng thái `open` mới có thể được accept hoặc decline. Khi accept,
-hệ thống tạo một task mới từ `title` và `description` của request, dùng state
-mặc định của project nếu có.
+hệ thống tạo một task mới từ `title` và `description` của request với status
+`open`.
 
 ### Project Page
 
@@ -201,7 +213,7 @@ Kết quả:
 - Task title: `Reset laptop access`.
 - Label: `it`.
 - Assignee: user có username `alex`, nếu tồn tại.
-- State: state mặc định của project, nếu project đã cấu hình.
+- Status: `open`.
 
 Các token bắt đầu bằng `#` được tạo hoặc gắn vào label của project. Token bắt đầu
 bằng `@` được dùng để tìm assignee theo username. Nếu username không tồn tại,
@@ -247,30 +259,29 @@ Trong giao diện và tài liệu nghiệp vụ, đơn vị công việc đượ
 endpoint và một số field API vẫn dùng `issue` để tương thích với backend hiện
 tại.
 
-| Resource       | Endpoint                |
-| -------------- | ----------------------- |
-| Workspace      | `/api/workspaces/`      |
-| Project        | `/api/projects/`        |
-| State          | `/api/project_states/`  |
-| Label          | `/api/project_labels/`  |
-| Cycle          | `/api/project_cycles/`  |
-| Module         | `/api/project_modules/` |
-| Task           | `/api/project_issues/`  |
-| Intake request | `/api/intake_requests/` |
-| Page           | `/api/project_pages/`   |
+| Resource       | Endpoint                 |
+| -------------- | ------------------------ |
+| Workspace      | `/api/workspaces/`       |
+| Project        | `/api/projects/`         |
+| Label          | `/api/project_labels/`   |
+| Cycle          | `/api/project_cycles/`   |
+| Module         | `/api/project_modules/`  |
+| Task           | `/api/project_issues/`   |
+| Subtask        | `/api/project_subtasks/` |
+| Intake request | `/api/intake_requests/`  |
+| Page           | `/api/project_pages/`    |
 
 Các resource hỗ trợ thao tác REST thông thường: list, create, retrieve, update,
 partial update và delete.
 
 Action riêng:
 
-| Action            | Method | Endpoint                                | Mục đích                                  |
-| ----------------- | ------ | --------------------------------------- | ----------------------------------------- |
-| Set default state | `POST` | `/api/project_states/{id}/set_default/` | Đặt state mặc định của project            |
-| Quick add task    | `POST` | `/api/project_issues/quick_add/`        | Tạo task từ text                          |
-| Rollover cycle    | `POST` | `/api/project_cycles/{id}/rollover/`    | Chuyển task chưa hoàn tất sang cycle khác |
-| Accept intake     | `POST` | `/api/intake_requests/{id}/accept/`     | Chấp nhận request và tạo task             |
-| Decline intake    | `POST` | `/api/intake_requests/{id}/decline/`    | Từ chối request                           |
+| Action         | Method | Endpoint                             | Mục đích                                  |
+| -------------- | ------ | ------------------------------------ | ----------------------------------------- |
+| Quick add task | `POST` | `/api/project_issues/quick_add/`     | Tạo task từ text                          |
+| Rollover cycle | `POST` | `/api/project_cycles/{id}/rollover/` | Chuyển task chưa hoàn tất sang cycle khác |
+| Accept intake  | `POST` | `/api/intake_requests/{id}/accept/`  | Chấp nhận request và tạo task             |
+| Decline intake | `POST` | `/api/intake_requests/{id}/decline/` | Từ chối request                           |
 
 Ví dụ quick add:
 
@@ -292,6 +303,19 @@ Content-Type: application/json
 
 {
   "next_cycle": 5
+}
+```
+
+Ví dụ tạo subtask:
+
+```http
+POST /api/project_subtasks/
+Content-Type: application/json
+
+{
+  "task": 42,
+  "title": "Chuẩn bị checklist onboarding",
+  "position": 1
 }
 ```
 
@@ -317,22 +341,23 @@ nếu payload không truyền lead.
 Các endpoint hỗ trợ lọc theo các trường chính:
 
 - Project: `workspace`, `lead`.
-- State: `project`, `is_default`, `is_completed`.
 - Label: `project`.
 - Cycle: `project`, `is_active`.
+- Task: `project`, `assignee`, `status`, `priority`, `cycle`, `module`,
+  `start_date`.
+- Subtask: `task`, `assignee`, `status`, `start_date`, `due_date`.
 
 Các endpoint cũng hỗ trợ search theo tên, tiêu đề hoặc mô tả tùy resource, và
 ordering theo các trường được khai báo trong API.
 
 ## Ghi chú triển khai hiện tại
 
-- Board hiện tại cho phép chuyển task giữa các state bằng các nút trong từng
-  card task.
+- Task hiện tại dùng 4 trạng thái cố định: `open`, `completed`, `in_progress`,
+  `cancel`.
 - List hiện tại hỗ trợ chỉnh priority nhanh.
+- Modal task hiện tại hỗ trợ tạo, hoàn tất, đổi trạng thái và xóa subtask.
 - Planning hiện tại tạo cycle, module và rollover cycle.
 - Intake hiện tại tạo request, accept và decline request.
-- Pages hiện tại tạo và liệt kê page; phần editor nội dung chi tiết chưa được
-  mở rộng trên giao diện hiện tại.
 - Project Management chưa cung cấp realtime collaboration, Command K menu, Gantt,
   calendar view hoặc tích hợp Slack/GitHub/GitLab/Google Calendar trong triển
   khai hiện tại.

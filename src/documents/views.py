@@ -161,7 +161,7 @@ from documents.models import ProjectIssue
 from documents.models import ProjectLabel
 from documents.models import ProjectModule
 from documents.models import ProjectPage
-from documents.models import ProjectState
+from documents.models import ProjectSubTask
 from documents.models import SavedView
 from documents.models import ShareLink
 from documents.models import ShareLinkBundle
@@ -211,7 +211,7 @@ from documents.serialisers import ProjectLabelSerializer
 from documents.serialisers import ProjectModuleSerializer
 from documents.serialisers import ProjectPageSerializer
 from documents.serialisers import ProjectSerializer
-from documents.serialisers import ProjectStateSerializer
+from documents.serialisers import ProjectSubTaskSerializer
 from documents.serialisers import RemovePasswordDocumentsSerializer
 from documents.serialisers import ReprocessDocumentsSerializer
 from documents.serialisers import RotateDocumentsSerializer
@@ -4884,42 +4884,6 @@ class _ProjectChildViewSet(ModelViewSet):
         serializer.save()
 
 
-class ProjectStateViewSet(_ProjectChildViewSet):
-    serializer_class = ProjectStateSerializer
-    filterset_fields = ("project", "is_default", "is_completed")
-    ordering_fields = ("position", "name")
-    search_fields = ("name",)
-
-    def get_queryset(self):
-        return ProjectState.objects.filter(
-            project__in=self.get_project_queryset(),
-        ).select_related("project")
-
-    def _sync_default(self, state: ProjectState) -> None:
-        if state.is_default:
-            ProjectState.objects.filter(project=state.project).exclude(
-                pk=state.pk,
-            ).update(
-                is_default=False,
-            )
-
-    def perform_create(self, serializer):
-        super().perform_create(serializer)
-        self._sync_default(serializer.instance)
-
-    def perform_update(self, serializer):
-        super().perform_update(serializer)
-        self._sync_default(serializer.instance)
-
-    @action(detail=True, methods=["post"])
-    def set_default(self, request, pk=None):
-        state = self.get_object()
-        ProjectState.objects.filter(project=state.project).update(is_default=False)
-        state.is_default = True
-        state.save(update_fields=["is_default"])
-        return Response(self.get_serializer(state).data)
-
-
 class ProjectLabelViewSet(_ProjectChildViewSet):
     serializer_class = ProjectLabelSerializer
     filterset_fields = ("project",)
@@ -4958,7 +4922,7 @@ class ProjectCycleViewSet(_ProjectChildViewSet):
             ProjectIssue.objects.filter(
                 cycle=cycle,
             )
-            .exclude(state__is_completed=True)
+            .exclude(status=ProjectIssue.Status.COMPLETED)
             .update(cycle=next_cycle)
         )
         cycle.is_active = False
@@ -4980,8 +4944,23 @@ class ProjectModuleViewSet(_ProjectChildViewSet):
 
 class ProjectIssueViewSet(_ProjectChildViewSet):
     serializer_class = ProjectIssueSerializer
-    filterset_fields = ("project", "assignee", "state", "priority", "cycle", "module")
-    ordering_fields = ("created_at", "updated_at", "priority", "due_date", "estimate")
+    filterset_fields = (
+        "project",
+        "assignee",
+        "status",
+        "priority",
+        "cycle",
+        "module",
+        "start_date",
+    )
+    ordering_fields = (
+        "created_at",
+        "updated_at",
+        "priority",
+        "start_date",
+        "due_date",
+        "estimate",
+    )
     search_fields = ("title", "description")
 
     def get_queryset(self):
@@ -4991,7 +4970,6 @@ class ProjectIssueViewSet(_ProjectChildViewSet):
                 "project",
                 "assignee",
                 "created_by",
-                "state",
                 "cycle",
                 "module",
             )
@@ -5021,12 +4999,10 @@ class ProjectIssueViewSet(_ProjectChildViewSet):
         assignee = (
             User.objects.filter(username=usernames[0]).first() if usernames else None
         )
-        state = ProjectState.objects.filter(project=project, is_default=True).first()
         issue = ProjectIssue.objects.create(
             project=project,
             title=title,
             assignee=assignee,
-            state=state,
             created_by=request.user,
         )
         labels = [
@@ -5035,6 +5011,30 @@ class ProjectIssueViewSet(_ProjectChildViewSet):
         ]
         issue.labels.set(labels)
         return Response(self.get_serializer(issue).data, status=status.HTTP_201_CREATED)
+
+
+class ProjectSubTaskViewSet(_ProjectChildViewSet):
+    serializer_class = ProjectSubTaskSerializer
+    filterset_fields = ("task", "assignee", "status", "start_date", "due_date")
+    ordering_fields = ("position", "created_at", "updated_at", "due_date", "estimate")
+    search_fields = ("title", "description")
+
+    def get_queryset(self):
+        return ProjectSubTask.objects.filter(
+            task__project__in=self.get_project_queryset(),
+        ).select_related("task", "task__project", "assignee", "created_by")
+
+    def _ensure_task_access(self, task: ProjectIssue) -> None:
+        self.ensure_project_access(task.project)
+
+    def perform_create(self, serializer):
+        self._ensure_task_access(serializer.validated_data["task"])
+        serializer.save(created_by=self.request.user)
+
+    def perform_update(self, serializer):
+        task = serializer.validated_data.get("task", serializer.instance.task)
+        self._ensure_task_access(task)
+        serializer.save()
 
 
 class IntakeRequestViewSet(_ProjectChildViewSet):
@@ -5057,15 +5057,10 @@ class IntakeRequestViewSet(_ProjectChildViewSet):
         intake = self.get_object()
         if intake.status != IntakeRequest.Status.OPEN:
             raise ValidationError({"status": "Only open requests can be accepted."})
-        state = ProjectState.objects.filter(
-            project=intake.project,
-            is_default=True,
-        ).first()
         issue = ProjectIssue.objects.create(
             project=intake.project,
             title=intake.title,
             description=intake.description,
-            state=state,
             created_by=request.user,
         )
         intake.status = IntakeRequest.Status.ACCEPTED

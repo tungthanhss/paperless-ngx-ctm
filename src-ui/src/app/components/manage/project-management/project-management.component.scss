@@ -204,6 +204,50 @@
   width: 9rem;
 }
 
+.task-dialog-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.task-dialog-field-span-2 {
+  grid-column: span 2;
+}
+
+.task-dialog-field-full {
+  grid-column: 1 / -1;
+}
+
+.task-subtasks {
+  padding-top: 1rem;
+  border-top: 1px solid var(--bs-border-color);
+}
+
+.task-subtask-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 0.5rem;
+}
+
+.task-subtask-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.task-subtask-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) minmax(8rem, 10rem) max-content;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.375rem;
+}
+
+.task-subtask-status {
+  min-width: 0;
+}
+
 .planning-grid,
 .intake-grid,
 .pages-grid {
@@ -252,6 +296,20 @@
   .planning-grid,
   .intake-grid,
   .pages-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-dialog-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-dialog-field-span-2,
+  .task-dialog-field-full {
+    grid-column: auto;
+  }
+
+  .task-subtask-add,
+  .task-subtask-row {
     grid-template-columns: 1fr;
   }
 

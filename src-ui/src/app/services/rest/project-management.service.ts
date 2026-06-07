@@ -8,6 +8,7 @@ import {
   ProjectCycle,
   ProjectLabel,
   ProjectModule,
+  ProjectSubTask,
   ProjectTask,
   Workspace,
 } from 'src/app/data/project-management'
@@ -21,6 +22,7 @@ type ResourceName =
   | 'project_cycles'
   | 'project_modules'
   | 'project_issues'
+  | 'project_subtasks'
   | 'intake_requests'
 
 @Injectable({
@@ -125,6 +127,10 @@ export class ProjectManagementService {
 
   listIssues(project: number) {
     return this.listTasks(project)
+  }
+
+  listSubTasks(task: number) {
+    return this.list<ProjectSubTask>('project_subtasks', { task })
   }
 
   listIntake(project: number) {

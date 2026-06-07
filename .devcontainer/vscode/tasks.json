@@ -209,7 +209,8 @@
 			},
 			"options": {
 				"cwd": "${workspaceFolder}/src-ui"
-			}
+			},
+			"problemMatcher": []
 		},
 		{
 			"label": "Project Setup: Run all Init Tasks",
@@ -228,7 +229,8 @@
 				"Start: Celery Worker",
 				"Start: Consumer Service (manage.py document_consumer)",
 				"Start: Backend Server (manage.py runserver)"
-			]
+			],
+			"problemMatcher": []
 		}
 	]
 }

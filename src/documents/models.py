@@ -1970,33 +1970,6 @@ class Project(ModelWithOwner):
         return f"{self.key}: {self.name}"
 
 
-class ProjectState(models.Model):
-    project = models.ForeignKey(
-        Project,
-        on_delete=models.CASCADE,
-        related_name="states",
-        verbose_name=_("project"),
-    )
-    name = models.CharField(_("name"), max_length=128)
-    position = models.PositiveIntegerField(_("position"), default=0)
-    is_default = models.BooleanField(_("is default"), default=False)
-    is_completed = models.BooleanField(_("is completed"), default=False)
-
-    class Meta:
-        verbose_name = _("project state")
-        verbose_name_plural = _("project states")
-        ordering = ("project", "position", "name")
-        constraints = [
-            models.UniqueConstraint(
-                fields=["project", "name"],
-                name="documents_projectstate_unique_name_project",
-            ),
-        ]
-
-    def __str__(self) -> str:
-        return f"{self.project.key}: {self.name}"
-
-
 class ProjectLabel(models.Model):
     project = models.ForeignKey(
         Project,
@@ -2076,6 +2049,12 @@ class ProjectModule(models.Model):
 
 
 class ProjectIssue(models.Model):
+    class Status(models.TextChoices):
+        OPEN = "open", _("Open")
+        COMPLETED = "completed", _("Completed")
+        IN_PROGRESS = "in_progress", _("In progress")
+        CANCEL = "cancel", _("Cancel")
+
     class Priority(models.TextChoices):
         URGENT = "urgent", _("Urgent")
         HIGH = "high", _("High")
@@ -2106,13 +2085,11 @@ class ProjectIssue(models.Model):
         related_name="created_project_issues",
         verbose_name=_("created by"),
     )
-    state = models.ForeignKey(
-        ProjectState,
-        blank=True,
-        null=True,
-        on_delete=models.SET_NULL,
-        related_name="issues",
-        verbose_name=_("state"),
+    status = models.CharField(
+        _("status"),
+        max_length=16,
+        choices=Status.choices,
+        default=Status.OPEN,
     )
     priority = models.CharField(
         _("priority"),
@@ -2143,6 +2120,7 @@ class ProjectIssue(models.Model):
         verbose_name=_("module"),
     )
     estimate = models.PositiveIntegerField(_("estimate"), default=0)
+    start_date = models.DateField(_("start date"), blank=True, null=True)
     due_date = models.DateField(_("due date"), blank=True, null=True)
     completed_at = models.DateTimeField(_("completed at"), blank=True, null=True)
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
@@ -2153,7 +2131,7 @@ class ProjectIssue(models.Model):
         verbose_name_plural = _("project issues")
         ordering = ("-created_at",)
         indexes = [
-            models.Index(fields=["project", "state"]),
+            models.Index(fields=["project", "status"]),
             models.Index(fields=["assignee", "created_at"]),
             models.Index(fields=["cycle", "created_at"]),
             models.Index(fields=["module", "created_at"]),
@@ -2163,9 +2141,68 @@ class ProjectIssue(models.Model):
         return f"{self.project.key}: {self.title}"
 
     def save(self, *args, **kwargs) -> None:
-        if self.state and self.state.is_completed and self.completed_at is None:
+        if self.status == self.Status.COMPLETED and self.completed_at is None:
             self.completed_at = timezone.now()
-        elif self.state and not self.state.is_completed:
+        elif self.status != self.Status.COMPLETED:
+            self.completed_at = None
+        super().save(*args, **kwargs)
+
+
+class ProjectSubTask(models.Model):
+    task = models.ForeignKey(
+        ProjectIssue,
+        on_delete=models.CASCADE,
+        related_name="subtasks",
+        verbose_name=_("task"),
+    )
+    title = models.CharField(_("title"), max_length=255)
+    description = models.TextField(_("description"), blank=True)
+    assignee = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="assigned_project_subtasks",
+        verbose_name=_("assignee"),
+    )
+    created_by = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="created_project_subtasks",
+        verbose_name=_("created by"),
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=16,
+        choices=ProjectIssue.Status.choices,
+        default=ProjectIssue.Status.OPEN,
+    )
+    start_date = models.DateField(_("start date"), blank=True, null=True)
+    due_date = models.DateField(_("due date"), blank=True, null=True)
+    estimate = models.PositiveIntegerField(_("estimate"), default=0)
+    position = models.PositiveIntegerField(_("position"), default=0)
+    completed_at = models.DateTimeField(_("completed at"), blank=True, null=True)
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("project subtask")
+        verbose_name_plural = _("project subtasks")
+        ordering = ("task", "position", "created_at")
+        indexes = [
+            models.Index(fields=["task", "status"]),
+            models.Index(fields=["assignee", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.task}: {self.title}"
+
+    def save(self, *args, **kwargs) -> None:
+        if self.status == ProjectIssue.Status.COMPLETED and self.completed_at is None:
+            self.completed_at = timezone.now()
+        elif self.status != ProjectIssue.Status.COMPLETED:
             self.completed_at = None
         super().save(*args, **kwargs)
 

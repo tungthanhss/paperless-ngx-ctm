@@ -6,8 +6,9 @@ import {
   NgbPaginationModule,
   NgbTypeaheadModule,
 } from '@ng-bootstrap/ng-bootstrap'
+import { NgSelectModule } from '@ng-select/ng-select'
 import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
-import { Observable, of } from 'rxjs'
+import { Observable, firstValueFrom, of } from 'rxjs'
 import {
   catchError,
   debounceTime,
@@ -19,6 +20,7 @@ import { ConfirmDialogComponent } from 'src/app/components/common/confirm-dialog
 import {
   Project,
   ProjectLabel,
+  ProjectSubTask,
   ProjectTask,
   ProjectTaskPriority,
   ProjectTaskStatus,
@@ -41,6 +43,7 @@ import { PageHeaderComponent } from '../../../common/page-header/page-header.com
     NgStyle,
     NgbPaginationModule,
     NgbTypeaheadModule,
+    NgSelectModule,
     NgxBootstrapIconsModule,
     PageHeaderComponent,
   ],
@@ -68,6 +71,13 @@ export class ProjectTasksComponent implements OnInit {
     estimate: 0,
   }
   editingTask: ProjectTask = null
+  subtasks: ProjectSubTask[] = []
+  subtaskDraft: Partial<ProjectSubTask> = {
+    title: '',
+    status: 'open',
+    estimate: 0,
+  }
+  subtasksLoading = false
   assigneeSearch = ''
   selectedAssigneeUsername = ''
   search = ''
@@ -197,7 +207,8 @@ export class ProjectTasksComponent implements OnInit {
     }
     this.assigneeSearch = ''
     this.selectedAssigneeUsername = ''
-    this.modalService.open(content, { backdrop: 'static' })
+    this.clearSubtasks()
+    this.modalService.open(content, { backdrop: 'static', size: 'xl' })
   }
 
   openEditDialog(
@@ -223,7 +234,8 @@ export class ProjectTasksComponent implements OnInit {
     this.assigneeSearch =
       task.assignee_username || task.assignee?.toString() || ''
     this.selectedAssigneeUsername = task.assignee_username || ''
-    this.modalService.open(content, { backdrop: 'static' })
+    this.reloadSubtasks(task.id)
+    this.modalService.open(content, { backdrop: 'static', size: 'xl' })
   }
 
   saveTask(modal: { close: () => void }): void {
@@ -265,6 +277,7 @@ export class ProjectTasksComponent implements OnInit {
         this.assigneeSearch = ''
         this.selectedAssigneeUsername = ''
         this.editingTask = null
+        this.clearSubtasks()
         this.page = 1
         this.reloadProjectData()
         this.toastService.showInfo(
@@ -353,6 +366,107 @@ export class ProjectTasksComponent implements OnInit {
     }
   }
 
+  addProjectLabel = async (name: string): Promise<ProjectLabel> => {
+    const labelName = name.trim()
+    const existingLabel = this.labels.find(
+      (label) => label.name.toLowerCase() === labelName.toLowerCase()
+    )
+    if (existingLabel) {
+      return existingLabel
+    }
+    const label = await firstValueFrom(
+      this.service.create<ProjectLabel>('project_labels', {
+        project: this.selectedProjectId,
+        name: labelName,
+        color: '#6b7280',
+      })
+    )
+    this.labels = [...this.labels, label]
+    return label
+  }
+
+  reloadSubtasks(taskId: number = this.editingTask?.id): void {
+    if (!taskId) {
+      this.clearSubtasks()
+      return
+    }
+    this.subtasksLoading = true
+    this.service.listSubTasks(taskId).subscribe({
+      next: (response) => {
+        this.subtasks = response.results
+        this.subtasksLoading = false
+      },
+      error: () => (this.subtasksLoading = false),
+    })
+  }
+
+  createSubtask(): void {
+    const title = this.subtaskDraft.title?.trim()
+    if (!this.editingTask?.id || !title) {
+      return
+    }
+    this.subtasksLoading = true
+    const position =
+      Math.max(0, ...this.subtasks.map((subtask) => subtask.position ?? 0)) + 1
+    this.service
+      .create<ProjectSubTask>('project_subtasks', {
+        task: this.editingTask.id,
+        title,
+        description: this.subtaskDraft.description ?? '',
+        status: this.subtaskDraft.status ?? 'open',
+        estimate: this.subtaskDraft.estimate ?? 0,
+        position,
+      })
+      .subscribe({
+        next: (subtask) => {
+          this.subtasks = [...this.subtasks, subtask]
+          this.subtaskDraft = { title: '', status: 'open', estimate: 0 }
+          this.subtasksLoading = false
+          this.reloadTasks()
+        },
+        error: (error) => {
+          this.subtasksLoading = false
+          this.toastService.showError($localize`Lỗi khi tạo subtask.`, error)
+        },
+      })
+  }
+
+  setSubtaskStatus(subtask: ProjectSubTask, status: ProjectTaskStatus): void {
+    this.service
+      .patch<ProjectSubTask>('project_subtasks', { id: subtask.id, status })
+      .subscribe({
+        next: (updatedSubtask) => {
+          this.subtasks = this.subtasks.map((item) =>
+            item.id === updatedSubtask.id ? updatedSubtask : item
+          )
+          this.reloadTasks()
+        },
+        error: (error) =>
+          this.toastService.showError(
+            $localize`Lỗi khi cập nhật subtask.`,
+            error
+          ),
+      })
+  }
+
+  toggleSubtask(subtask: ProjectSubTask): void {
+    this.setSubtaskStatus(
+      subtask,
+      subtask.status === 'completed' ? 'open' : 'completed'
+    )
+  }
+
+  deleteSubtask(subtask: ProjectSubTask): void {
+    this.service.delete('project_subtasks', subtask.id).subscribe({
+      next: () => {
+        this.subtasks = this.subtasks.filter((item) => item.id !== subtask.id)
+        this.reloadTasks()
+      },
+      error: (error) =>
+        this.toastService.showError($localize`Lỗi khi xóa subtask.`, error),
+    })
+  }
+
   setPriority(task: ProjectTask, priority: ProjectTaskPriority): void {
     this.service
       .patch<ProjectTask>('project_issues', { id: task.id, priority })
@@ -421,5 +535,11 @@ export class ProjectTasksComponent implements OnInit {
     this.tasks = []
     this.totalTasks = 0
     this.loading = false
+  }
+
+  private clearSubtasks(): void {
+    this.subtasks = []
+    this.subtaskDraft = { title: '', status: 'open', estimate: 0 }
+    this.subtasksLoading = false
   }
 }

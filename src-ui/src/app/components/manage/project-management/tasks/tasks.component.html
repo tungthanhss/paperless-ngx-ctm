@@ -107,6 +107,13 @@
               @if (task.description) {
                 <div class="small text-muted">{{ task.description }}</div>
               }
+              @if (task.subtasks_total) {
+                <div class="small text-muted">
+                  <ng-container i18n>Subtask</ng-container>:
+                  {{ task.subtasks_completed || 0 }}/{{ task.subtasks_total }}
+                  ({{ task.subtasks_progress || 0 }}%)
+                </div>
+              }
               @if (task.labels?.length) {
                 <div class="labels mt-1">
                   @for (labelId of task.labels; track labelId) {
@@ -198,35 +205,12 @@
       <button type="button" class="btn-close" aria-label="Đóng" i18n-aria-label (click)="modal.dismiss()"></button>
     </div>
     <div class="modal-body">
-      <div class="mb-3">
-        <label class="form-label" for="taskTitle" i18n>Tiêu đề</label>
-        <input id="taskTitle" class="form-control" name="taskTitle" [(ngModel)]="draft.title" required autofocus />
-      </div>
-      <div class="mb-3">
-        <label class="form-label" for="taskDescription" i18n>Mô tả</label>
-        <textarea id="taskDescription" class="form-control" name="taskDescription" rows="3" [(ngModel)]="draft.description"></textarea>
-      </div>
-      <div class="row">
-        <div class="col-12 col-md-6 mb-3">
-          <label class="form-label" for="taskState" i18n>Trạng thái</label>
-          <select id="taskState" class="form-select" name="taskState" [(ngModel)]="draft.status">
-            @for (status of statuses; track status) {
-              <option [ngValue]="status">{{ statusLabel(status) }}</option>
-            }
-          </select>
+      <div class="task-dialog-grid">
+        <div>
+          <label class="form-label" for="taskTitle" i18n>Tiêu đề</label>
+          <input id="taskTitle" class="form-control" name="taskTitle" [(ngModel)]="draft.title" required autofocus />
         </div>
-        <div class="col-12 col-md-6 mb-3">
-          <label class="form-label" for="taskPriority" i18n>Độ ưu tiên</label>
-          <select id="taskPriority" class="form-select" name="taskPriority" [(ngModel)]="draft.priority">
-            <option value="urgent" i18n>Khẩn cấp</option>
-            <option value="high" i18n>Cao</option>
-            <option value="medium" i18n>Trung bình</option>
-            <option value="low" i18n>Thấp</option>
-          </select>
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-12 col-md-6 mb-3">
+        <div>
           <label class="form-label" for="taskAssignee" i18n>Người thực hiện</label>
           <input
             id="taskAssignee"
@@ -242,28 +226,147 @@
             placeholder="Tìm username"
             i18n-placeholder />
         </div>
-        <div class="col-12 col-md-6 mb-3">
+        <div>
+          <label class="form-label" for="taskState" i18n>Trạng thái</label>
+          <select id="taskState" class="form-select" name="taskState" [(ngModel)]="draft.status">
+            @for (status of statuses; track status) {
+              <option [ngValue]="status">{{ statusLabel(status) }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="form-label" for="taskPriority" i18n>Độ ưu tiên</label>
+          <select id="taskPriority" class="form-select" name="taskPriority" [(ngModel)]="draft.priority">
+            <option value="urgent" i18n>Khẩn cấp</option>
+            <option value="high" i18n>Cao</option>
+            <option value="medium" i18n>Trung bình</option>
+            <option value="low" i18n>Thấp</option>
+          </select>
+        </div>
+        <div>
           <label class="form-label" for="taskStartDate" i18n>Ngày bắt đầu</label>
           <input id="taskStartDate" class="form-control" type="date" name="taskStartDate" [(ngModel)]="draft.start_date" />
         </div>
-      </div>
-      <div class="row">
-        <div class="col-12 col-md-6 mb-3">
+        <div>
           <label class="form-label" for="taskDueDate" i18n>Hạn xử lý</label>
           <input id="taskDueDate" class="form-control" type="date" name="taskDueDate" [(ngModel)]="draft.due_date" />
         </div>
-        <div class="col-12 col-md-6 mb-3">
+        <div>
           <label class="form-label" for="taskEstimate" i18n>Ước lượng</label>
           <input id="taskEstimate" class="form-control" type="number" min="0" name="taskEstimate" [(ngModel)]="draft.estimate" />
         </div>
+        <div class="task-dialog-field-span-2">
+          <label class="form-label" for="taskLabels" i18n>Nhãn</label>
+          <ng-select
+            id="taskLabels"
+            name="taskLabels"
+            [items]="labels"
+            bindLabel="name"
+            bindValue="id"
+            [(ngModel)]="draft.labels"
+            [multiple]="true"
+            [closeOnSelect]="false"
+            [clearSearchOnAdd]="true"
+            [hideSelected]="true"
+            [addTag]="addProjectLabel"
+            addTagText="Tạo nhãn"
+            i18n-addTagText
+            placeholder="Tìm hoặc tạo nhãn"
+            i18n-placeholder>
+            <ng-template ng-label-tmp let-item="item" let-clear="clear">
+              <span class="label" [ngStyle]="{ background: item.color || labelColor(item.id) }">
+                {{ item.name || labelName(item.id) }}
+                <button class="btn btn-link btn-sm text-white p-0 ms-1" type="button" aria-label="Xóa nhãn" i18n-aria-label (click)="clear(item)">&times;</button>
+              </span>
+            </ng-template>
+            <ng-template ng-option-tmp let-item="item">
+              <span class="label" [ngStyle]="{ background: item.color || '#6b7280' }">{{ item.name }}</span>
+            </ng-template>
+          </ng-select>
+        </div>
+        <div class="task-dialog-field-full">
+          <label class="form-label" for="taskDescription" i18n>Mô tả</label>
+          <textarea id="taskDescription" class="form-control" name="taskDescription" rows="3" [(ngModel)]="draft.description"></textarea>
+        </div>
       </div>
-      <div class="mb-0">
-        <label class="form-label" for="taskLabels" i18n>Nhãn</label>
-        <select id="taskLabels" class="form-select" name="taskLabels" multiple [(ngModel)]="draft.labels">
-          @for (label of labels; track label.id) {
-            <option [ngValue]="label.id">{{ label.name }}</option>
+      <div class="task-subtasks mt-4">
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+          <div>
+            <h5 class="mb-0" i18n>Subtask</h5>
+            @if (editingTask) {
+              <div class="small text-muted">
+                <ng-container i18n>{subtasks.length, plural, =0 {Chưa có subtask} =1 {1 subtask} other {{{subtasks.length}} subtask}}</ng-container>
+              </div>
+            }
+          </div>
+          @if (subtasksLoading) {
+            <div class="spinner-border spinner-border-sm" role="status"></div>
           }
-        </select>
+        </div>
+
+        @if (editingTask) {
+          <div class="task-subtask-add">
+            <input
+              class="form-control form-control-sm"
+              name="subtaskTitle"
+              [(ngModel)]="subtaskDraft.title"
+              (keydown.enter)="createSubtask(); $event.preventDefault()"
+              placeholder="Thêm subtask"
+              i18n-placeholder />
+            <button class="btn btn-sm btn-outline-primary" type="button" (click)="createSubtask()" [disabled]="!subtaskDraft.title?.trim() || subtasksLoading">
+              <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Thêm</ng-container>
+            </button>
+          </div>
+
+          <div class="task-subtask-list mt-2">
+            @for (subtask of subtasks; track subtask.id) {
+              <div class="task-subtask-row">
+                <button
+                  class="btn btn-sm btn-link p-0"
+                  type="button"
+                  [class.text-success]="subtask.status === 'completed'"
+                  (click)="toggleSubtask(subtask)"
+                  title="Đổi trạng thái hoàn thành"
+                  i18n-title>
+                  @if (subtask.status === 'completed') {
+                    <i-bs name="check-circle"></i-bs>
+                  } @else {
+                    <i-bs name="circle"></i-bs>
+                  }
+                </button>
+                <div class="min-w-0">
+                  <div [class.text-decoration-line-through]="subtask.status === 'completed'">{{ subtask.title }}</div>
+                  @if (subtask.due_date || subtask.assignee_username) {
+                    <div class="small text-muted">
+                      @if (subtask.assignee_username) {
+                        <span>{{ '@' + subtask.assignee_username }}</span>
+                      }
+                      @if (subtask.due_date) {
+                        <span>{{ subtask.due_date | customDate:'short' }}</span>
+                      }
+                    </div>
+                  }
+                </div>
+                <select
+                  class="form-select form-select-sm task-subtask-status"
+                  name="subtaskStatus{{ subtask.id }}"
+                  [ngModel]="subtask.status"
+                  (ngModelChange)="setSubtaskStatus(subtask, $event)">
+                  @for (status of statuses; track status) {
+                    <option [ngValue]="status">{{ statusLabel(status) }}</option>
+                  }
+                </select>
+                <button class="btn btn-sm btn-outline-danger" type="button" (click)="deleteSubtask(subtask)" title="Xóa subtask" i18n-title>
+                  <i-bs name="trash"></i-bs>
+                </button>
+              </div>
+            } @empty {
+              <div class="text-muted small" i18n>Chưa có subtask nào.</div>
+            }
+          </div>
+        } @else {
+          <div class="text-muted small" i18n>Lưu công việc trước khi thêm subtask.</div>
+        }
       </div>
     </div>
     <div class="modal-footer">
