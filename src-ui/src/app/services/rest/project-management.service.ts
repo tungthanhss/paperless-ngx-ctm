@@ -8,8 +8,6 @@ import {
   ProjectCycle,
   ProjectLabel,
   ProjectModule,
-  ProjectPage,
-  ProjectState,
   ProjectTask,
   Workspace,
 } from 'src/app/data/project-management'
@@ -19,13 +17,11 @@ import { environment } from 'src/environments/environment'
 type ResourceName =
   | 'workspaces'
   | 'projects'
-  | 'project_states'
   | 'project_labels'
   | 'project_cycles'
   | 'project_modules'
   | 'project_issues'
   | 'intake_requests'
-  | 'project_pages'
 
 @Injectable({
   providedIn: 'root',
@@ -63,13 +59,6 @@ export class ProjectManagementService {
 
   delete(resource: ResourceName, id: number): Observable<void> {
     return this.http.delete<void>(this.url(resource, id))
-  }
-
-  setDefaultState(id: number): Observable<ProjectState> {
-    return this.http.post<ProjectState>(
-      this.url('project_states', id, 'set_default'),
-      {}
-    )
   }
 
   quickAddTask(project: number, text: string): Observable<ProjectTask> {
@@ -118,10 +107,6 @@ export class ProjectManagementService {
     return this.list<Project>('projects', { workspace })
   }
 
-  listStates(project: number) {
-    return this.list<ProjectState>('project_states', { project })
-  }
-
   listLabels(project: number) {
     return this.list<ProjectLabel>('project_labels', { project })
   }
@@ -144,10 +129,6 @@ export class ProjectManagementService {
 
   listIntake(project: number) {
     return this.list<IntakeRequest>('intake_requests', { project })
-  }
-
-  listPages(project: number) {
-    return this.list<ProjectPage>('project_pages', { project })
   }
 
   private url(

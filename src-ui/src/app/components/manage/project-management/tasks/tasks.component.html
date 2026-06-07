@@ -1,121 +1,280 @@
-<pngx-page-header title="Quản lý task" i18n-title [loading]="loading"></pngx-page-header>
+<pngx-page-header title="Quản lý công việc" i18n-title [loading]="loading"></pngx-page-header>
 
 <div class="project-management">
-  <section class="pm-toolbar">
-    <div class="selector">
-      <label class="form-label" for="workspaceSelect" i18n>Workspace</label>
-      <select id="workspaceSelect" class="form-select" [(ngModel)]="selectedWorkspaceId" (ngModelChange)="reloadProjects()">
+  <div class="d-flex justify-content-end mb-2">
+    <button class="btn btn-sm btn-outline-primary" type="button" (click)="openCreateDialog(taskDialog)" [disabled]="!selectedProjectId">
+      <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Tạo mới</ng-container>
+    </button>
+  </div>
+
+  <div class="row mb-3">
+    <div class="col-12 col-lg-3 mb-2 mb-lg-0">
+      <label class="text-muted me-2 mb-1" for="workspaceSelect" i18n>Không gian làm việc</label>
+      <select id="workspaceSelect" class="form-select form-select-sm" [(ngModel)]="selectedWorkspaceId" (ngModelChange)="workspaceChanged()">
         @for (workspace of workspaces; track workspace.id) {
           <option [ngValue]="workspace.id">{{ workspace.name }}</option>
         }
       </select>
     </div>
-    <div class="selector">
-      <label class="form-label" for="projectSelect" i18n>Project</label>
-      <select id="projectSelect" class="form-select" [(ngModel)]="selectedProjectId" (ngModelChange)="reloadProjectData()">
+
+    <div class="col-12 col-lg-3 mb-2 mb-lg-0">
+      <label class="text-muted me-2 mb-1" for="projectSelect" i18n>Dự án</label>
+      <select id="projectSelect" class="form-select form-select-sm" [(ngModel)]="selectedProjectId" (ngModelChange)="projectChanged()">
         @for (project of projects; track project.id) {
           <option [ngValue]="project.id">{{ project.key }} · {{ project.name }}</option>
         }
       </select>
     </div>
-    <form class="quick-add" (ngSubmit)="quickAddTask()">
-      <label class="form-label" for="quickAddTask" i18n>Quick add task</label>
-      <div class="input-group">
-        <input id="quickAddTask" class="form-control" name="quickAddTask" [(ngModel)]="quickAddText" placeholder="Title #label @assignee" i18n-placeholder />
-        <button class="btn btn-primary" type="submit" [disabled]="!selectedProjectId">
-          <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Add</ng-container>
-        </button>
-      </div>
-    </form>
-  </section>
 
-  <section class="summary-band">
-    <div>
-      <span class="metric">{{ tasks.length }}</span>
-      <span class="metric-label" i18n>Tasks</span>
+    <div class="col mb-2 mb-xl-0">
+      <form class="form-inline d-flex align-items-end h-100" (ngSubmit)="searchTasks()">
+        <div class="flex-fill">
+          <label class="text-muted me-2 mb-1" for="taskSearch" i18n>Lọc theo:</label>
+          <input
+            id="taskSearch"
+            class="form-control form-control-sm"
+            type="text"
+            name="taskSearch"
+            [(ngModel)]="search"
+            placeholder="Tiêu đề hoặc mô tả"
+            i18n-placeholder />
+        </div>
+        @if (search) {
+          <button class="btn btn-sm btn-outline-secondary ms-2" type="button" (click)="clearSearch()">
+            <i-bs name="x"></i-bs>
+          </button>
+        }
+      </form>
     </div>
-    <div>
-      <span class="metric">{{ completedTasks }}</span>
-      <span class="metric-label" i18n>Done</span>
-    </div>
-    <div class="progress-wrap">
-      <div class="d-flex justify-content-between small text-muted">
-        <span i18n>Progress</span>
-        <span>{{ progress }}%</span>
-      </div>
-      <div class="progress">
-        <div class="progress-bar" [style.width.%]="progress"></div>
-      </div>
-    </div>
-  </section>
 
-  <ul class="nav nav-tabs pm-tabs">
-    <li class="nav-item">
-      <button class="nav-link" [class.active]="view === 'board'" type="button" (click)="view = 'board'">
-        <i-bs name="diagram3" class="me-1"></i-bs><ng-container i18n>Board</ng-container>
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" [class.active]="view === 'list'" type="button" (click)="view = 'list'">
-        <i-bs name="list-task" class="me-1"></i-bs><ng-container i18n>List</ng-container>
-      </button>
-    </li>
-  </ul>
+    <div class="col-auto mb-2 mb-xl-0">
+      <div class="form-inline d-flex align-items-end h-100">
+        <div class="input-group input-group-sm w-auto d-none d-md-flex">
+          <span class="input-group-text border-0" i18n>Hiển thị:</span>
+        </div>
+        <div class="input-group input-group-sm w-auto me-3">
+          <select class="form-select form-select-sm small" [(ngModel)]="pageSize" (ngModelChange)="page = 1; reloadTasks()">
+            <option [ngValue]="25">25</option>
+            <option [ngValue]="50">50</option>
+            <option [ngValue]="100">100</option>
+          </select>
+          <span class="input-group-text text-muted d-none d-md-flex" i18n>mỗi trang</span>
+        </div>
+        <ngb-pagination
+          [pageSize]="pageSize"
+          [collectionSize]="totalTasks"
+          [(page)]="page"
+          [maxSize]="5"
+          [rotate]="true"
+          size="sm"
+          aria-label="Phân trang công việc"
+          (pageChange)="reloadTasks()">
+        </ngb-pagination>
+      </div>
+    </div>
+  </div>
 
-  @if (view === 'board') {
-    <section class="board">
-      @for (state of states; track state.id) {
-        <div class="state-column">
-          <header>
-            <div>
-              <h2>{{ state.name }}</h2>
-              <span class="text-muted small">{{ tasksForState(state).length }}</span>
-            </div>
-          </header>
-          @for (task of tasksForState(state); track task.id) {
-            <article class="task-item" [ngClass]="priorityClass(task.priority)">
-              <div class="task-title">{{ task.title }}</div>
-              <div class="task-meta">
-                <span>{{ task.priority }}</span>
-                @if (task.assignee_username) {
-                  <span>@{{ task.assignee_username }}</span>
-                }
+  <div class="card border table-responsive mb-3">
+    <table class="table table-striped align-middle shadow-sm mb-0">
+      <thead>
+        <tr>
+          <th class="fw-normal" i18n>Tiêu đề</th>
+          <th class="fw-normal d-none d-md-table-cell" i18n>Trạng thái</th>
+          <th class="fw-normal d-none d-lg-table-cell" i18n>Độ ưu tiên</th>
+          <th class="fw-normal d-none d-xl-table-cell" i18n>Người thực hiện</th>
+          <th class="fw-normal d-none d-xl-table-cell" i18n>Ngày bắt đầu</th>
+          <th class="fw-normal d-none d-xl-table-cell" i18n>Hạn xử lý</th>
+          <th class="fw-normal d-none d-lg-table-cell" i18n>Ngày tạo</th>
+          <th class="fw-normal" i18n>Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading && tasks.length === 0) {
+          <tr>
+            <td colspan="8">
+              <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+              <ng-container i18n>Đang tải...</ng-container>
+            </td>
+          </tr>
+        }
+        @for (task of tasks; track task.id) {
+          <tr class="data-row fade show">
+            <td>
+              <button class="btn btn-link ms-0 ps-0 text-start" (click)="openEditDialog(taskDialog, task, $event)">
+                {{ task.title }}
+              </button>
+              <div class="small text-muted d-md-none">{{ taskStatusLabel(task) }} · {{ priorityLabel(task.priority) }}</div>
+              @if (task.description) {
+                <div class="small text-muted">{{ task.description }}</div>
+              }
+              @if (task.labels?.length) {
+                <div class="labels mt-1">
+                  @for (labelId of task.labels; track labelId) {
+                    <span class="label" [ngStyle]="{ background: labelColor(labelId) }">{{ labelName(labelId) }}</span>
+                  }
+                </div>
+              }
+            </td>
+            <td class="d-none d-md-table-cell">{{ taskStatusLabel(task) }}</td>
+            <td class="d-none d-lg-table-cell">{{ priorityLabel(task.priority) }}</td>
+            <td class="d-none d-xl-table-cell">{{ task.assignee_username || task.assignee || '-' }}</td>
+            <td class="d-none d-xl-table-cell">
+              @if (task.start_date) {
+                {{ task.start_date | customDate:'short' }}
+              } @else {
+                -
+              }
+            </td>
+            <td class="d-none d-xl-table-cell">
+              @if (task.due_date) {
+                {{ task.due_date | customDate:'short' }}
+              } @else {
+                -
+              }
+            </td>
+            <td class="d-none d-lg-table-cell">
+              @if (task.created_at) {
+                {{ task.created_at | customDate:'short' }}
+              } @else {
+                -
+              }
+            </td>
+            <td>
+              <div class="btn-group">
+                <button class="btn btn-sm btn-outline-secondary" type="button" (click)="openEditDialog(taskDialog, task, $event)">
+                  <i-bs width="1em" height="1em" name="pencil" class="me-1"></i-bs><ng-container i18n>Sửa</ng-container>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" type="button" (click)="openDeleteDialog(task, $event)">
+                  <i-bs width="1em" height="1em" name="trash" class="me-1"></i-bs><ng-container i18n>Xóa</ng-container>
+                </button>
               </div>
-              <div class="labels">
-                @for (labelId of task.labels; track labelId) {
-                  <span class="label" [ngStyle]="{ background: labelColor(labelId) }">{{ labelName(labelId) }}</span>
-                }
-              </div>
-              <div class="btn-group btn-group-sm w-100">
-                @for (targetState of states; track targetState.id) {
-                  <button class="btn btn-outline-secondary" type="button" (click)="moveTask(task, targetState)" [disabled]="task.state === targetState.id">
-                    {{ targetState.name }}
-                  </button>
-                }
-              </div>
-            </article>
+            </td>
+          </tr>
+        } @empty {
+          @if (!loading) {
+            <tr>
+              <td colspan="8" class="text-muted small" i18n>Không tìm thấy công việc nào.</td>
+            </tr>
           }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (!loading || tasks.length > 0) {
+    <div class="d-flex mb-2">
+      @if (totalTasks > 0) {
+        <div>
+          <ng-container i18n>{totalTasks, plural, =1 {Một công việc} other {{{totalTasks || 0}} công việc}}</ng-container>
         </div>
       }
-    </section>
-  }
-
-  @if (view === 'list') {
-    <section class="list-group">
-      @for (task of tasks; track task.id) {
-        <article class="list-group-item task-row">
-          <div>
-            <div class="fw-semibold">{{ task.title }}</div>
-            <div class="small text-muted">{{ stateName(task) }} · {{ task.created_at }}</div>
-          </div>
-          <select class="form-select form-select-sm" [ngModel]="task.priority" (ngModelChange)="setPriority(task, $event)">
-            <option value="urgent" i18n>Urgent</option>
-            <option value="high" i18n>High</option>
-            <option value="medium" i18n>Medium</option>
-            <option value="low" i18n>Low</option>
-          </select>
-        </article>
+      @if (totalTasks > 20) {
+        <ngb-pagination
+          class="ms-auto"
+          [pageSize]="pageSize"
+          [collectionSize]="totalTasks"
+          [(page)]="page"
+          [maxSize]="5"
+          [rotate]="true"
+          size="sm"
+          aria-label="Phân trang công việc"
+          (pageChange)="reloadTasks()">
+        </ngb-pagination>
       }
-    </section>
+    </div>
   }
 </div>
+
+<ng-template #taskDialog let-modal>
+  <form (ngSubmit)="saveTask(modal)">
+    <div class="modal-header">
+      <h4 class="modal-title">
+        @if (editingTask) {
+          <ng-container i18n>Sửa công việc</ng-container>
+        } @else {
+          <ng-container i18n>Tạo công việc</ng-container>
+        }
+      </h4>
+      <button type="button" class="btn-close" aria-label="Đóng" i18n-aria-label (click)="modal.dismiss()"></button>
+    </div>
+    <div class="modal-body">
+      <div class="mb-3">
+        <label class="form-label" for="taskTitle" i18n>Tiêu đề</label>
+        <input id="taskTitle" class="form-control" name="taskTitle" [(ngModel)]="draft.title" required autofocus />
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="taskDescription" i18n>Mô tả</label>
+        <textarea id="taskDescription" class="form-control" name="taskDescription" rows="3" [(ngModel)]="draft.description"></textarea>
+      </div>
+      <div class="row">
+        <div class="col-12 col-md-6 mb-3">
+          <label class="form-label" for="taskState" i18n>Trạng thái</label>
+          <select id="taskState" class="form-select" name="taskState" [(ngModel)]="draft.status">
+            @for (status of statuses; track status) {
+              <option [ngValue]="status">{{ statusLabel(status) }}</option>
+            }
+          </select>
+        </div>
+        <div class="col-12 col-md-6 mb-3">
+          <label class="form-label" for="taskPriority" i18n>Độ ưu tiên</label>
+          <select id="taskPriority" class="form-select" name="taskPriority" [(ngModel)]="draft.priority">
+            <option value="urgent" i18n>Khẩn cấp</option>
+            <option value="high" i18n>Cao</option>
+            <option value="medium" i18n>Trung bình</option>
+            <option value="low" i18n>Thấp</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-12 col-md-6 mb-3">
+          <label class="form-label" for="taskAssignee" i18n>Người thực hiện</label>
+          <input
+            id="taskAssignee"
+            class="form-control"
+            type="text"
+            name="taskAssignee"
+            [(ngModel)]="assigneeSearch"
+            [ngbTypeahead]="searchAssignees"
+            [inputFormatter]="assigneeFormatter"
+            [resultFormatter]="assigneeFormatter"
+            (selectItem)="selectAssignee($event)"
+            (ngModelChange)="assigneeChanged($event)"
+            placeholder="Tìm username"
+            i18n-placeholder />
+        </div>
+        <div class="col-12 col-md-6 mb-3">
+          <label class="form-label" for="taskStartDate" i18n>Ngày bắt đầu</label>
+          <input id="taskStartDate" class="form-control" type="date" name="taskStartDate" [(ngModel)]="draft.start_date" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-12 col-md-6 mb-3">
+          <label class="form-label" for="taskDueDate" i18n>Hạn xử lý</label>
+          <input id="taskDueDate" class="form-control" type="date" name="taskDueDate" [(ngModel)]="draft.due_date" />
+        </div>
+        <div class="col-12 col-md-6 mb-3">
+          <label class="form-label" for="taskEstimate" i18n>Ước lượng</label>
+          <input id="taskEstimate" class="form-control" type="number" min="0" name="taskEstimate" [(ngModel)]="draft.estimate" />
+        </div>
+      </div>
+      <div class="mb-0">
+        <label class="form-label" for="taskLabels" i18n>Nhãn</label>
+        <select id="taskLabels" class="form-select" name="taskLabels" multiple [(ngModel)]="draft.labels">
+          @for (label of labels; track label.id) {
+            <option [ngValue]="label.id">{{ label.name }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()" i18n>Hủy</button>
+      <button class="btn btn-primary" type="submit" [disabled]="!draft.title?.trim() || loading">
+        @if (editingTask) {
+          <ng-container i18n>Lưu</ng-container>
+        } @else {
+          <ng-container i18n>Tạo mới</ng-container>
+        }
+      </button>
+    </div>
+  </form>
+</ng-template>

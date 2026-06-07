@@ -1,38 +1,192 @@
-<pngx-page-header title="Quản lý project" i18n-title [loading]="loading"></pngx-page-header>
+<pngx-page-header title="Quản lý dự án" i18n-title [loading]="loading"></pngx-page-header>
 
 <div class="project-management">
-  <section class="pm-toolbar single">
-    <div class="selector">
-      <label class="form-label" for="workspaceSelect" i18n>Workspace</label>
-      <select id="workspaceSelect" class="form-select" [(ngModel)]="selectedWorkspaceId" (ngModelChange)="reloadProjects()">
+  <div class="d-flex justify-content-end mb-2">
+    <button class="btn btn-sm btn-outline-primary" type="button" (click)="openCreateDialog(projectDialog)" [disabled]="!selectedWorkspaceId">
+      <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Tạo mới</ng-container>
+    </button>
+  </div>
+
+  <div class="row mb-3">
+    <div class="col-12 col-lg-4 mb-2 mb-lg-0">
+      <label class="text-muted me-2 mb-1" for="workspaceSelect" i18n>Không gian làm việc</label>
+      <select id="workspaceSelect" class="form-select form-select-sm" [(ngModel)]="selectedWorkspaceId" (ngModelChange)="workspaceChanged()">
         @for (workspace of workspaces; track workspace.id) {
           <option [ngValue]="workspace.id">{{ workspace.name }}</option>
         }
       </select>
     </div>
-  </section>
 
-  <section class="form-band">
-    <form class="create-form" (ngSubmit)="createProject()">
-      <h2 i18n>Project</h2>
-      <input class="form-control" name="projectKey" [(ngModel)]="draft.key" placeholder="Key" i18n-placeholder />
-      <input class="form-control" name="projectName" [(ngModel)]="draft.name" placeholder="Name" i18n-placeholder />
-      <input class="form-control" name="projectDescription" [(ngModel)]="draft.description" placeholder="Description" i18n-placeholder />
-      <button class="btn btn-sm btn-outline-primary" type="submit" [disabled]="!selectedWorkspaceId">
-        <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Create</ng-container>
-      </button>
-    </form>
-  </section>
-
-  <section class="list-grid">
-    @for (project of projects; track project.id) {
-      <article class="list-card">
-        <i-bs name="diagram3"></i-bs>
-        <div>
-          <div class="fw-semibold">{{ project.key }} · {{ project.name }}</div>
-          <div class="small text-muted">{{ project.description }}</div>
+    <div class="col mb-2 mb-xl-0">
+      <form class="form-inline d-flex align-items-end h-100" (ngSubmit)="searchProjects()">
+        <div class="flex-fill">
+          <label class="text-muted me-2 mb-1" for="projectSearch" i18n>Lọc theo:</label>
+          <input
+            id="projectSearch"
+            class="form-control form-control-sm"
+            type="text"
+            name="projectSearch"
+            [(ngModel)]="search"
+            placeholder="Mã, tên, mô tả"
+            i18n-placeholder />
         </div>
-      </article>
-    }
-  </section>
+        @if (search) {
+          <button class="btn btn-sm btn-outline-secondary ms-2" type="button" (click)="clearSearch()">
+            <i-bs name="x"></i-bs>
+          </button>
+        }
+      </form>
+    </div>
+
+    <div class="col-auto mb-2 mb-xl-0">
+      <div class="form-inline d-flex align-items-end h-100">
+        <div class="input-group input-group-sm w-auto d-none d-md-flex">
+          <span class="input-group-text border-0" i18n>Hiển thị:</span>
+        </div>
+        <div class="input-group input-group-sm w-auto me-3">
+          <select class="form-select form-select-sm small" [(ngModel)]="pageSize" (ngModelChange)="page = 1; reloadProjects()">
+            <option [ngValue]="25">25</option>
+            <option [ngValue]="50">50</option>
+            <option [ngValue]="100">100</option>
+          </select>
+          <span class="input-group-text text-muted d-none d-md-flex" i18n>mỗi trang</span>
+        </div>
+        <ngb-pagination
+          [pageSize]="pageSize"
+          [collectionSize]="totalProjects"
+          [(page)]="page"
+          [maxSize]="5"
+          [rotate]="true"
+          size="sm"
+          aria-label="Phân trang dự án"
+          (pageChange)="reloadProjects()">
+        </ngb-pagination>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border table-responsive mb-3">
+    <table class="table table-striped align-middle shadow-sm mb-0">
+      <thead>
+        <tr>
+          <th class="fw-normal" i18n>Mã</th>
+          <th class="fw-normal" i18n>Tên</th>
+          <th class="fw-normal d-none d-md-table-cell" i18n>Mô tả</th>
+          <th class="fw-normal d-none d-sm-table-cell" i18n>Người phụ trách</th>
+          <th class="fw-normal d-none d-lg-table-cell" i18n>Ngày tạo</th>
+          <th class="fw-normal" i18n>Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading && projects.length === 0) {
+          <tr>
+            <td colspan="6">
+              <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+              <ng-container i18n>Đang tải...</ng-container>
+            </td>
+          </tr>
+        }
+        @for (project of projects; track project.id) {
+          <tr class="data-row fade show">
+            <td class="fw-semibold">{{ project.key }}</td>
+            <td>
+              <button class="btn btn-link ms-0 ps-0 text-start" (click)="openEditDialog(projectDialog, project, $event)">
+                {{ project.name }}
+              </button>
+              @if (project.description) {
+                <div class="small text-muted d-md-none">{{ project.description }}</div>
+              }
+            </td>
+            <td class="d-none d-md-table-cell">{{ project.description || '-' }}</td>
+            <td class="d-none d-sm-table-cell">{{ project.lead_username || project.lead || '-' }}</td>
+            <td class="d-none d-lg-table-cell">
+              @if (project.created_at) {
+                {{ project.created_at | customDate:'short' }}
+              } @else {
+                -
+              }
+            </td>
+            <td>
+              <div class="btn-group">
+                <button class="btn btn-sm btn-outline-secondary" type="button" (click)="openEditDialog(projectDialog, project, $event)">
+                  <i-bs width="1em" height="1em" name="pencil" class="me-1"></i-bs><ng-container i18n>Sửa</ng-container>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" type="button" (click)="openDeleteDialog(project, $event)">
+                  <i-bs width="1em" height="1em" name="trash" class="me-1"></i-bs><ng-container i18n>Xóa</ng-container>
+                </button>
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          @if (!loading) {
+            <tr>
+              <td colspan="6" class="text-muted small" i18n>Không tìm thấy dự án nào.</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (!loading || projects.length > 0) {
+    <div class="d-flex mb-2">
+      @if (totalProjects > 0) {
+        <div>
+          <ng-container i18n>{totalProjects, plural, =1 {Một dự án} other {{{totalProjects || 0}} dự án}}</ng-container>
+        </div>
+      }
+      @if (totalProjects > 20) {
+        <ngb-pagination
+          class="ms-auto"
+          [pageSize]="pageSize"
+          [collectionSize]="totalProjects"
+          [(page)]="page"
+          [maxSize]="5"
+          [rotate]="true"
+          size="sm"
+          aria-label="Phân trang dự án"
+          (pageChange)="reloadProjects()">
+        </ngb-pagination>
+      }
+    </div>
+  }
 </div>
+
+<ng-template #projectDialog let-modal>
+  <form (ngSubmit)="saveProject(modal)">
+    <div class="modal-header">
+      <h4 class="modal-title">
+        @if (editingProject) {
+          <ng-container i18n>Sửa dự án</ng-container>
+        } @else {
+          <ng-container i18n>Tạo dự án</ng-container>
+        }
+      </h4>
+      <button type="button" class="btn-close" aria-label="Đóng" i18n-aria-label (click)="modal.dismiss()"></button>
+    </div>
+    <div class="modal-body">
+      <div class="mb-3">
+        <label class="form-label" for="projectKey" i18n>Mã</label>
+        <input id="projectKey" class="form-control" name="projectKey" [(ngModel)]="draft.key" required autofocus />
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="projectName" i18n>Tên</label>
+        <input id="projectName" class="form-control" name="projectName" [(ngModel)]="draft.name" required />
+      </div>
+      <div class="mb-0">
+        <label class="form-label" for="projectDescription" i18n>Mô tả</label>
+        <textarea id="projectDescription" class="form-control" name="projectDescription" rows="3" [(ngModel)]="draft.description"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()" i18n>Hủy</button>
+      <button class="btn btn-primary" type="submit" [disabled]="!draft.key?.trim() || !draft.name?.trim() || loading">
+        @if (editingProject) {
+          <ng-container i18n>Lưu</ng-container>
+        } @else {
+          <ng-container i18n>Tạo mới</ng-container>
+        }
+      </button>
+    </div>
+  </form>
+</ng-template>

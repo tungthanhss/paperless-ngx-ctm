@@ -1,45 +1,79 @@
-import { NgClass, NgStyle } from '@angular/common'
-import { Component, OnInit, inject } from '@angular/core'
+import { NgStyle } from '@angular/common'
+import { Component, OnInit, TemplateRef, inject } from '@angular/core'
 import { FormsModule } from '@angular/forms'
+import {
+  NgbModal,
+  NgbPaginationModule,
+  NgbTypeaheadModule,
+} from '@ng-bootstrap/ng-bootstrap'
 import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
+import { Observable, of } from 'rxjs'
+import {
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  map,
+  switchMap,
+} from 'rxjs/operators'
+import { ConfirmDialogComponent } from 'src/app/components/common/confirm-dialog/confirm-dialog.component'
 import {
   Project,
   ProjectLabel,
-  ProjectState,
   ProjectTask,
   ProjectTaskPriority,
+  ProjectTaskStatus,
   Workspace,
 } from 'src/app/data/project-management'
+import { User } from 'src/app/data/user'
+import { CustomDatePipe } from 'src/app/pipes/custom-date.pipe'
 import { ProjectManagementService } from 'src/app/services/rest/project-management.service'
+import { UserService } from 'src/app/services/rest/user.service'
+import { ToastService } from 'src/app/services/toast.service'
 import { PageHeaderComponent } from '../../../common/page-header/page-header.component'
-
-type TaskView = 'board' | 'list'
 
 @Component({
   selector: 'pngx-project-tasks',
   templateUrl: './tasks.component.html',
   styleUrl: '../project-management.component.scss',
   imports: [
+    CustomDatePipe,
     FormsModule,
-    NgClass,
     NgStyle,
+    NgbPaginationModule,
+    NgbTypeaheadModule,
     NgxBootstrapIconsModule,
     PageHeaderComponent,
   ],
 })
 export class ProjectTasksComponent implements OnInit {
   private readonly service = inject(ProjectManagementService)
+  private readonly userService = inject(UserService)
+  private readonly modalService = inject(NgbModal)
+  private readonly toastService = inject(ToastService)
 
   loading = false
   workspaces: Workspace[] = []
   projects: Project[] = []
-  states: ProjectState[] = []
   labels: ProjectLabel[] = []
   tasks: ProjectTask[] = []
+  statuses: ProjectTaskStatus[] = ['open', 'in_progress', 'completed', 'cancel']
   selectedWorkspaceId: number = null
   selectedProjectId: number = null
-  quickAddText = ''
-  view: TaskView = 'board'
+  draft: Partial<ProjectTask> = {
+    title: '',
+    description: '',
+    status: 'open',
+    priority: 'medium',
+    labels: [],
+    estimate: 0,
+  }
+  editingTask: ProjectTask = null
+  assigneeSearch = ''
+  selectedAssigneeUsername = ''
+  search = ''
+  page = 1
+  pageSize = 25
+  totalTasks = 0
 
   ngOnInit(): void {
     this.reloadWorkspaces()
@@ -62,10 +96,15 @@ export class ProjectTasksComponent implements OnInit {
       next: (response) => {
         this.workspaces = response.results
         this.selectedWorkspaceId ??= this.workspaces[0]?.id ?? null
-        this.reloadProjects()
+        this.workspaceChanged()
       },
       error: () => (this.loading = false),
     })
+  }
+
+  workspaceChanged(): void {
+    this.page = 1
+    this.reloadProjects()
   }
 
   reloadProjects(): void {
@@ -75,6 +114,7 @@ export class ProjectTasksComponent implements OnInit {
       this.clearProjectData()
       return
     }
+    this.loading = true
     this.service.listProjects(this.selectedWorkspaceId).subscribe({
       next: (response) => {
         this.projects = response.results
@@ -85,10 +125,15 @@ export class ProjectTasksComponent implements OnInit {
         ) {
           this.selectedProjectId = this.projects[0]?.id ?? null
         }
-        this.reloadProjectData()
+        this.projectChanged()
       },
       error: () => (this.loading = false),
     })
+  }
+
+  projectChanged(): void {
+    this.page = 1
+    this.reloadProjectData()
   }
 
   reloadProjectData(): void {
@@ -98,45 +143,214 @@ export class ProjectTasksComponent implements OnInit {
     }
     const projectId = this.selectedProjectId
     this.loading = true
-    this.service.listStates(projectId).subscribe({
-      next: (states) => (this.states = states.results),
-      error: () => (this.loading = false),
-    })
     this.service.listLabels(projectId).subscribe({
       next: (labels) => (this.labels = labels.results),
       error: () => (this.loading = false),
     })
-    this.service.listTasks(projectId).subscribe({
-      next: (tasks) => {
-        this.tasks = tasks.results
-        this.loading = false
-      },
-      error: () => (this.loading = false),
-    })
+    this.reloadTasks()
   }
 
-  quickAddTask(): void {
-    if (!this.selectedProjectId || !this.quickAddText.trim()) {
+  reloadTasks(): void {
+    if (!this.selectedProjectId) {
+      this.tasks = []
+      this.totalTasks = 0
+      this.loading = false
       return
     }
+    this.loading = true
     this.service
-      .quickAddTask(this.selectedProjectId, this.quickAddText)
+      .list<ProjectTask>('project_issues', {
+        project: this.selectedProjectId,
+        page: this.page,
+        page_size: this.pageSize,
+        search: this.search.trim(),
+      })
       .subscribe({
-        next: () => {
-          this.quickAddText = ''
-          this.reloadProjectData()
+        next: (tasks) => {
+          this.tasks = tasks.results
+          this.totalTasks = tasks.count
+          this.loading = false
         },
         error: () => (this.loading = false),
       })
   }
 
-  moveTask(task: ProjectTask, state: ProjectState): void {
+  searchTasks(): void {
+    this.page = 1
+    this.reloadTasks()
+  }
+
+  clearSearch(): void {
+    this.search = ''
+    this.searchTasks()
+  }
+
+  openCreateDialog(content: TemplateRef<unknown>): void {
+    this.editingTask = null
+    this.draft = {
+      title: '',
+      description: '',
+      priority: 'medium',
+      status: 'open',
+      labels: [],
+      estimate: 0,
+    }
+    this.assigneeSearch = ''
+    this.selectedAssigneeUsername = ''
+    this.modalService.open(content, { backdrop: 'static' })
+  }
+
+  openEditDialog(
+    content: TemplateRef<unknown>,
+    task: ProjectTask,
+    event?: Event
+  ): void {
+    event?.stopPropagation()
+    this.editingTask = task
+    this.draft = {
+      id: task.id,
+      project: task.project,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+      labels: task.labels ?? [],
+      estimate: task.estimate,
+      assignee: task.assignee,
+      start_date: task.start_date,
+      due_date: task.due_date,
+    }
+    this.assigneeSearch =
+      task.assignee_username || task.assignee?.toString() || ''
+    this.selectedAssigneeUsername = task.assignee_username || ''
+    this.modalService.open(content, { backdrop: 'static' })
+  }
+
+  saveTask(modal: { close: () => void }): void {
+    if (!this.selectedProjectId || !this.draft.title?.trim()) {
+      return
+    }
+    this.loading = true
+    const payload: Partial<ProjectTask> = {
+      project: this.selectedProjectId,
+      title: this.draft.title.trim(),
+      description: this.draft.description ?? '',
+      status: this.draft.status ?? 'open',
+      priority: this.draft.priority ?? 'medium',
+      labels: this.draft.labels ?? [],
+      estimate: this.draft.estimate ?? 0,
+      assignee: this.draft.assignee || null,
+      start_date: this.draft.start_date || null,
+      due_date: this.draft.due_date || null,
+    }
+    const request = this.editingTask
+      ? this.service.patch<ProjectTask>('project_issues', {
+          id: this.editingTask.id,
+          ...payload,
+        })
+      : this.service.create<ProjectTask>('project_issues', payload)
+
+    request.subscribe({
+      next: () => {
+        const wasEditing = !!this.editingTask
+        modal.close()
+        this.draft = {
+          title: '',
+          description: '',
+          status: 'open',
+          priority: 'medium',
+          labels: [],
+          estimate: 0,
+        }
+        this.assigneeSearch = ''
+        this.selectedAssigneeUsername = ''
+        this.editingTask = null
+        this.page = 1
+        this.reloadProjectData()
+        this.toastService.showInfo(
+          wasEditing
+            ? $localize`Đã cập nhật công việc.`
+            : $localize`Đã tạo công việc.`
+        )
+      },
+      error: (error) => {
+        this.loading = false
+        this.toastService.showError($localize`Lỗi khi lưu công việc.`, error)
+      },
+    })
+  }
+
+  openDeleteDialog(task: ProjectTask, event?: Event): void {
+    event?.stopPropagation()
+    const activeModal = this.modalService.open(ConfirmDialogComponent, {
+      backdrop: 'static',
+    })
+    activeModal.componentInstance.title = $localize`Xác nhận xóa`
+    activeModal.componentInstance.messageBold = $localize`Xóa công việc "${task.title}"?`
+    activeModal.componentInstance.btnClass = 'btn-danger'
+    activeModal.componentInstance.btnCaption = $localize`Xóa`
+    activeModal.componentInstance.confirmClicked.subscribe(() => {
+      activeModal.componentInstance.buttonsEnabled = false
+      this.service.delete('project_issues', task.id).subscribe({
+        next: () => {
+          activeModal.close()
+          this.reloadProjectData()
+          this.toastService.showInfo($localize`Đã xóa công việc.`)
+        },
+        error: (error) => {
+          activeModal.componentInstance.buttonsEnabled = true
+          this.toastService.showError($localize`Lỗi khi xóa công việc.`, error)
+        },
+      })
+    })
+  }
+
+  moveTask(task: ProjectTask, status: ProjectTaskStatus): void {
     this.service
-      .patch<ProjectTask>('project_issues', { id: task.id, state: state.id })
+      .patch<ProjectTask>('project_issues', { id: task.id, status })
       .subscribe({
         next: () => this.reloadProjectData(),
         error: () => (this.loading = false),
       })
+  }
+
+  searchAssignees = (text$: Observable<string>) =>
+    text$.pipe(
+      debounceTime(200),
+      distinctUntilChanged(),
+      switchMap((term) =>
+        term.trim().length < 2
+          ? of([])
+          : this.userService
+              .list(1, 10, 'username', false, {
+                username__icontains: term.trim(),
+              })
+              .pipe(
+                map((response) => response.results),
+                catchError(() => of([]))
+              )
+      )
+    )
+
+  assigneeFormatter = (user: User | string) =>
+    typeof user === 'string' ? user : user?.username || ''
+
+  selectAssignee(event): void {
+    event.preventDefault()
+    const user = event.item as User
+    this.draft.assignee = user.id
+    this.assigneeSearch = user.username || ''
+    this.selectedAssigneeUsername = this.assigneeSearch
+  }
+
+  assigneeChanged(value: string): void {
+    if (!value?.trim()) {
+      this.draft.assignee = null
+      this.assigneeSearch = ''
+      this.selectedAssigneeUsername = ''
+    } else if (value !== this.selectedAssigneeUsername) {
+      this.draft.assignee = null
+    }
   }
 
   setPriority(task: ProjectTask, priority: ProjectTaskPriority): void {
@@ -148,16 +362,27 @@ export class ProjectTasksComponent implements OnInit {
       })
   }
 
-  tasksForState(state: ProjectState): ProjectTask[] {
-    return this.tasks.filter((task) => task.state === state.id)
+  tasksForStatus(status: ProjectTaskStatus): ProjectTask[] {
+    return this.tasks.filter((task) => task.status === status)
   }
 
-  stateName(task: ProjectTask): string {
-    return (
-      task.state_name ||
-      this.states.find((state) => state.id === task.state)?.name ||
-      ''
-    )
+  statusLabel(status: ProjectTaskStatus): string {
+    switch (status) {
+      case 'open':
+        return $localize`Open`
+      case 'completed':
+        return $localize`Completed`
+      case 'in_progress':
+        return $localize`In progress`
+      case 'cancel':
+        return $localize`Cancel`
+      default:
+        return status
+    }
+  }
+
+  taskStatusLabel(task: ProjectTask): string {
+    return task.status_display || this.statusLabel(task.status)
   }
 
   labelName(labelId: number): string {
@@ -169,19 +394,32 @@ export class ProjectTasksComponent implements OnInit {
   }
 
   isCompleted(task: ProjectTask): boolean {
-    return this.states.some(
-      (state) => state.id === task.state && state.is_completed
-    )
+    return task.status === 'completed'
   }
 
   priorityClass(priority: string): string {
     return `priority-${priority}`
   }
 
+  priorityLabel(priority: ProjectTaskPriority): string {
+    switch (priority) {
+      case 'urgent':
+        return $localize`Khẩn cấp`
+      case 'high':
+        return $localize`Cao`
+      case 'medium':
+        return $localize`Trung bình`
+      case 'low':
+        return $localize`Thấp`
+      default:
+        return priority
+    }
+  }
+
   private clearProjectData(): void {
-    this.states = []
     this.labels = []
     this.tasks = []
+    this.totalTasks = 0
     this.loading = false
   }
 }

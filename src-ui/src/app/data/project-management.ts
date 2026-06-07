@@ -25,14 +25,6 @@ export interface Project extends ObjectWithId {
   updated_at?: string
 }
 
-export interface ProjectState extends ObjectWithId {
-  project: number
-  name: string
-  position: number
-  is_default: boolean
-  is_completed: boolean
-}
-
 export interface ProjectLabel extends ObjectWithId {
   project: number
   name: string
@@ -61,6 +53,7 @@ export interface ProjectModule extends ObjectWithId {
 }
 
 export type ProjectTaskPriority = 'urgent' | 'high' | 'medium' | 'low'
+export type ProjectTaskStatus = 'open' | 'completed' | 'in_progress' | 'cancel'
 
 export interface ProjectTask extends ObjectWithId {
   project: number
@@ -70,13 +63,14 @@ export interface ProjectTask extends ObjectWithId {
   assignee_username?: string
   created_by?: number
   created_by_username?: string
-  state?: number
-  state_name?: string
+  status: ProjectTaskStatus
+  status_display?: string
   priority: ProjectTaskPriority
   labels: number[]
   cycle?: number
   module?: number
   estimate: number
+  start_date?: string
   due_date?: string
   completed_at?: string
   created_at?: string
@@ -98,16 +92,6 @@ export interface IntakeRequest extends ObjectWithId {
   status: IntakeRequestStatus
   review_comment: string
   accepted_issue?: number
-  created_at?: string
-  updated_at?: string
-}
-
-export interface ProjectPage extends ObjectWithId {
-  project: number
-  title: string
-  content: unknown[]
-  created_by?: number
-  created_by_username?: string
   created_at?: string
   updated_at?: string
 }

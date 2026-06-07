@@ -4,8 +4,11 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "ng": "ng",
-    "start": "ng serve",
-    "build": "ng build",
+    "start": "ng serve --configuration development",
+    "build": "ng build --configuration development",
+    "build:i18n": "ng build --configuration en-US",
+    "build:prod": "ng build --configuration production",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "test": "ng test --no-watch --coverage",
     "lint": "ng lint"
   },

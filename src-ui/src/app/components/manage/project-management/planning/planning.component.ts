@@ -143,7 +143,9 @@ export class ProjectPlanningComponent implements OnInit {
     }
     this.service.rolloverCycle(cycle.id, nextCycle).subscribe({
       next: (result) => {
-        this.toastService.showInfo($localize`${result.moved} task(s) moved.`)
+        this.toastService.showInfo(
+          $localize`Đã chuyển ${result.moved} công việc.`
+        )
         this.reloadProjectData()
       },
       error: () => (this.loading = false),

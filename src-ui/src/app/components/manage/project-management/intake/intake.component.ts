@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms'
 import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
 import {
   IntakeRequest,
+  IntakeRequestStatus,
   Project,
   Workspace,
 } from 'src/app/data/project-management'
@@ -123,5 +124,18 @@ export class ProjectIntakeComponent implements OnInit {
       },
       error: () => (this.loading = false),
     })
+  }
+
+  statusLabel(status: IntakeRequestStatus): string {
+    switch (status) {
+      case 'open':
+        return $localize`Đang mở`
+      case 'accepted':
+        return $localize`Đã duyệt`
+      case 'declined':
+        return $localize`Đã từ chối`
+      default:
+        return status
+    }
   }
 }

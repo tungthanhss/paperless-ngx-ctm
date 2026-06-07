@@ -100,6 +100,13 @@
             }
           },
           "configurations": {
+            "development": {
+              "localize": false,
+              "optimization": false,
+              "sourceMap": true,
+              "namedChunks": true,
+              "extractLicenses": false
+            },
             "production": {
               "fileReplacements": [
                 {
@@ -132,12 +139,12 @@
               ]
             }
           },
-          "defaultConfiguration": ""
+          "defaultConfiguration": "development"
         },
         "serve": {
           "builder": "@angular-builders/custom-webpack:dev-server",
           "options": {
-            "buildTarget": "paperless-ui:build:en-US"
+            "buildTarget": "paperless-ui:build:development"
           },
           "configurations": {
             "production": {

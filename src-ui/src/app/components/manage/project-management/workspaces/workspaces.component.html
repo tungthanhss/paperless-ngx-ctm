@@ -1,73 +1,187 @@
-<pngx-page-header title="Quản lý workspace" i18n-title [loading]="loading"></pngx-page-header>
+<pngx-page-header title="Quản lý không gian làm việc" i18n-title [loading]="loading"></pngx-page-header>
 
 <div class="project-management">
-  <section class="summary-band">
-    <form class="input-group input-group-sm" (ngSubmit)="searchWorkspaces()">
-      <span class="input-group-text">
-        <i-bs name="search"></i-bs>
-      </span>
-      <input
-        class="form-control"
-        name="workspaceSearch"
-        [(ngModel)]="search"
-        placeholder="Tìm kiếm theo tên"
-        i18n-placeholder />
-      @if (search) {
-        <button class="btn btn-outline-secondary" type="button" (click)="clearSearch()">
-          <i-bs name="x"></i-bs>
-        </button>
-      }
-      <button class="btn btn-outline-primary" type="submit" i18n>Search</button>
-    </form>
+  <div class="d-flex justify-content-end mb-2">
+    <button class="btn btn-sm btn-outline-primary" type="button" (click)="openCreateDialog(workspaceDialog)">
+      <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Tạo mới</ng-container>
+    </button>
+  </div>
 
-    @if (totalWorkspaces) {
-      <ngb-pagination
-        [pageSize]="pageSize"
-        [collectionSize]="totalWorkspaces"
-        [(page)]="page"
-        [maxSize]="5"
-        [rotate]="true"
-        size="sm"
-        aria-label="Workspace pagination"
-        (pageChange)="reload()">
-      </ngb-pagination>
-    }
-  </section>
+  <div class="row mb-3">
+    <div class="col mb-2 mb-xl-0">
+      <form class="form-inline d-flex align-items-center" (ngSubmit)="searchWorkspaces()">
+        <label class="text-muted me-2 mb-0" for="workspaceSearch" i18n>Lọc theo:</label>
+        <input
+          id="workspaceSearch"
+          class="form-control form-control-sm flex-fill w-auto"
+          type="text"
+          name="workspaceSearch"
+          [(ngModel)]="search"
+          placeholder="Tên"
+          i18n-placeholder />
+        @if (search) {
+          <button class="btn btn-sm btn-outline-secondary ms-2" type="button" (click)="clearSearch()">
+            <i-bs name="x"></i-bs>
+          </button>
+        }
+      </form>
+    </div>
 
-  <section class="form-band">
-    <form class="create-form" (ngSubmit)="createWorkspace()">
-      <h2 i18n>Workspace</h2>
-      <input class="form-control" name="workspaceName" [(ngModel)]="draft.name" placeholder="Name" i18n-placeholder />
-      <input class="form-control" name="workspaceDescription" [(ngModel)]="draft.description" placeholder="Description" i18n-placeholder />
-      <button class="btn btn-sm btn-outline-primary" type="submit">
-        <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Create</ng-container>
-      </button>
-    </form>
-  </section>
-
-  <section class="list-grid">
-    @for (workspace of workspaces; track workspace.id) {
-      <article class="list-card">
-        <i-bs name="hdd-stack"></i-bs>
-        <div>
-          <div class="fw-semibold">{{ workspace.name }}</div>
-          <div class="small text-muted">{{ workspace.description }}</div>
-          <div class="task-meta">
-            <span>
-              <ng-container i18n>Created by</ng-container>:
-              {{ workspace.owner_username || workspace.owner }}
-            </span>
-            @if (workspace.created_at) {
-              <span>
-                <ng-container i18n>Created</ng-container>:
-                {{ workspace.created_at | customDate:'short' }}
-              </span>
-            }
-          </div>
+    <div class="col-auto mb-2 mb-xl-0">
+      <div class="form-inline d-flex align-items-center">
+        <div class="input-group input-group-sm w-auto d-none d-md-flex">
+          <span class="input-group-text border-0" i18n>Hiển thị:</span>
         </div>
-      </article>
-    } @empty {
-      <div class="text-muted small" i18n>No workspaces found.</div>
-    }
-  </section>
+        <div class="input-group input-group-sm w-auto me-3">
+          <select class="form-select form-select-sm small" [(ngModel)]="pageSize" (ngModelChange)="page = 1; reload()">
+            <option [ngValue]="25">25</option>
+            <option [ngValue]="50">50</option>
+            <option [ngValue]="100">100</option>
+          </select>
+          <span class="input-group-text text-muted d-none d-md-flex" i18n>mỗi trang</span>
+        </div>
+        <ngb-pagination
+          [pageSize]="pageSize"
+          [collectionSize]="totalWorkspaces"
+          [(page)]="page"
+          [maxSize]="5"
+          [rotate]="true"
+          size="sm"
+          aria-label="Phân trang không gian làm việc"
+          (pageChange)="reload()">
+        </ngb-pagination>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border table-responsive mb-3">
+    <table class="table table-striped align-middle shadow-sm mb-0">
+      <thead>
+        <tr>
+          <th class="fw-normal" i18n>Tên</th>
+          <th class="fw-normal d-none d-md-table-cell" i18n>Mô tả</th>
+          <th class="fw-normal d-none d-sm-table-cell" i18n>Chủ sở hữu</th>
+          <th class="fw-normal d-none d-lg-table-cell" i18n>Ngày tạo</th>
+          <th class="fw-normal" i18n>Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading && workspaces.length === 0) {
+          <tr>
+            <td colspan="5">
+              <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+              <ng-container i18n>Đang tải...</ng-container>
+            </td>
+          </tr>
+        }
+        @for (workspace of workspaces; track workspace.id) {
+          <tr class="data-row fade show">
+            <td>
+              <button class="btn btn-link ms-0 ps-0 text-start" (click)="openEditDialog(workspaceDialog, workspace, $event)">
+                {{ workspace.name }}
+              </button>
+              @if (workspace.description) {
+                <div class="small text-muted d-md-none">{{ workspace.description }}</div>
+              }
+            </td>
+            <td class="d-none d-md-table-cell">{{ workspace.description || '-' }}</td>
+            <td class="d-none d-sm-table-cell">{{ workspace.owner_username || workspace.owner || '-' }}</td>
+            <td class="d-none d-lg-table-cell">
+              @if (workspace.created_at) {
+                {{ workspace.created_at | customDate:'short' }}
+              } @else {
+                -
+              }
+            </td>
+            <td>
+              <div class="btn-group">
+                <button class="btn btn-sm btn-outline-secondary" type="button" (click)="openEditDialog(workspaceDialog, workspace, $event)">
+                  <i-bs width="1em" height="1em" name="pencil" class="me-1"></i-bs><ng-container i18n>Sửa</ng-container>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" type="button" (click)="openDeleteDialog(workspace, $event)">
+                  <i-bs width="1em" height="1em" name="trash" class="me-1"></i-bs><ng-container i18n>Xóa</ng-container>
+                </button>
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          @if (!loading) {
+            <tr>
+              <td colspan="5" class="text-muted small" i18n>Không tìm thấy không gian làm việc nào.</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (!loading || workspaces.length > 0) {
+    <div class="d-flex mb-2">
+      @if (totalWorkspaces > 0) {
+        <div>
+          <ng-container i18n>{totalWorkspaces, plural, =1 {Một không gian làm việc} other {{{totalWorkspaces || 0}} không gian làm việc}}</ng-container>
+        </div>
+      }
+      @if (totalWorkspaces > 20) {
+        <ngb-pagination
+          class="ms-auto"
+          [pageSize]="pageSize"
+          [collectionSize]="totalWorkspaces"
+          [(page)]="page"
+          [maxSize]="5"
+          [rotate]="true"
+          size="sm"
+          aria-label="Phân trang không gian làm việc"
+          (pageChange)="reload()">
+        </ngb-pagination>
+      }
+    </div>
+  }
 </div>
+
+<ng-template #workspaceDialog let-modal>
+  <form (ngSubmit)="saveWorkspace(modal)">
+    <div class="modal-header">
+      <h4 class="modal-title">
+        @if (editingWorkspace) {
+          <ng-container i18n>Sửa không gian làm việc</ng-container>
+        } @else {
+          <ng-container i18n>Tạo không gian làm việc</ng-container>
+        }
+      </h4>
+      <button type="button" class="btn-close" aria-label="Đóng" i18n-aria-label (click)="modal.dismiss()"></button>
+    </div>
+    <div class="modal-body">
+      <div class="mb-3">
+        <label class="form-label" for="workspaceName" i18n>Tên</label>
+        <input
+          id="workspaceName"
+          class="form-control"
+          name="workspaceName"
+          [(ngModel)]="draft.name"
+          required
+          autofocus />
+      </div>
+      <div class="mb-0">
+        <label class="form-label" for="workspaceDescription" i18n>Mô tả</label>
+        <textarea
+          id="workspaceDescription"
+          class="form-control"
+          name="workspaceDescription"
+          rows="3"
+          [(ngModel)]="draft.description">
+        </textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()" i18n>Hủy</button>
+      <button class="btn btn-primary" type="submit" [disabled]="!draft.name?.trim() || loading">
+        @if (editingWorkspace) {
+          <ng-container i18n>Lưu</ng-container>
+        } @else {
+          <ng-container i18n>Tạo mới</ng-container>
+        }
+      </button>
+    </div>
+  </form>
+</ng-template>

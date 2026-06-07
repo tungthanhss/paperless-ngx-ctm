@@ -15,11 +15,9 @@ import { DocumentAttributesComponent } from './components/manage/document-attrib
 import { MailComponent } from './components/manage/mail/mail.component'
 import { ProjectDashboardComponent } from './components/manage/project-management/dashboard/project-dashboard.component'
 import { ProjectIntakeComponent } from './components/manage/project-management/intake/intake.component'
-import { ProjectPagesComponent } from './components/manage/project-management/pages/pages.component'
 import { ProjectPlanningComponent } from './components/manage/project-management/planning/planning.component'
 import { ProjectManagementComponent } from './components/manage/project-management/project-management.component'
 import { ProjectsComponent } from './components/manage/project-management/projects/projects.component'
-import { StatesComponent } from './components/manage/project-management/states/states.component'
 import { ProjectTasksComponent } from './components/manage/project-management/tasks/tasks.component'
 import { WorkspacesComponent } from './components/manage/project-management/workspaces/workspaces.component'
 import { SavedViewsComponent } from './components/manage/saved-views/saved-views.component'
@@ -304,11 +302,6 @@ export const routes: Routes = [
             data: { componentName: 'ProjectsComponent' },
           },
           {
-            path: 'states',
-            component: StatesComponent,
-            data: { componentName: 'StatesComponent' },
-          },
-          {
             path: 'tasks',
             component: ProjectTasksComponent,
             data: { componentName: 'ProjectTasksComponent' },
@@ -322,11 +315,6 @@ export const routes: Routes = [
             path: 'intake',
             component: ProjectIntakeComponent,
             data: { componentName: 'ProjectIntakeComponent' },
-          },
-          {
-            path: 'pages',
-            component: ProjectPagesComponent,
-            data: { componentName: 'ProjectPagesComponent' },
           },
         ],
       },

@@ -2,7 +2,6 @@ import { Component, OnInit, inject } from '@angular/core'
 import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
 import {
   Project,
-  ProjectState,
   ProjectTask,
   Workspace,
 } from 'src/app/data/project-management'
@@ -21,7 +20,6 @@ export class ProjectDashboardComponent implements OnInit {
   loading = true
   workspaces: Workspace[] = []
   projects: Project[] = []
-  states: ProjectState[] = []
   tasks: ProjectTask[] = []
   openIntakeCount = 0
 
@@ -95,8 +93,7 @@ export class ProjectDashboardComponent implements OnInit {
       return
     }
 
-    let remaining = this.projects.length * 3
-    this.states = []
+    let remaining = this.projects.length * 2
     this.tasks = []
     this.openIntakeCount = 0
     const finish = () => {
@@ -107,13 +104,6 @@ export class ProjectDashboardComponent implements OnInit {
     }
 
     this.projects.forEach((project) => {
-      this.service.listStates(project.id).subscribe({
-        next: (response) => {
-          this.states.push(...response.results)
-          finish()
-        },
-        error: finish,
-      })
       this.service.listTasks(project.id).subscribe({
         next: (response) => {
           this.tasks.push(...response.results)
@@ -134,8 +124,6 @@ export class ProjectDashboardComponent implements OnInit {
   }
 
   private isCompleted(task: ProjectTask): boolean {
-    return this.states.some(
-      (state) => state.id === task.state && state.is_completed
-    )
+    return task.status === 'completed'
   }
 }
