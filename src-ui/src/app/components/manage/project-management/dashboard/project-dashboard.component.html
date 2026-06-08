@@ -1,43 +1,57 @@
 <pngx-page-header title="Thống kê công việc" i18n-title [loading]="loading"></pngx-page-header>
 
 <div class="project-management">
+  <section class="dashboard-filter">
+    <label class="form-label" for="dashboardWorkspaceSelect" i18n>Không gian làm việc</label>
+    <select
+      id="dashboardWorkspaceSelect"
+      class="form-select form-select-sm"
+      [(ngModel)]="selectedWorkspaceId"
+      (ngModelChange)="workspaceChanged()">
+      <option [ngValue]="null" i18n>Tất cả workspace</option>
+      @for (workspace of workspaces; track workspace.id) {
+        <option [ngValue]="workspace.id">{{ workspace.name }}</option>
+      }
+    </select>
+  </section>
+
   <section class="summary-grid">
-    <article class="stat-card">
+    <article class="stat-card stat-card-workspaces">
       <i-bs name="hdd-stack"></i-bs>
       <div>
-        <span class="metric">{{ workspaces.length }}</span>
+        <span class="metric">{{ selectedWorkspaces.length }}</span>
         <span class="metric-label" i18n>Không gian làm việc</span>
       </div>
     </article>
-    <article class="stat-card">
+    <article class="stat-card stat-card-projects">
       <i-bs name="diagram3"></i-bs>
       <div>
         <span class="metric">{{ projects.length }}</span>
         <span class="metric-label" i18n>Dự án</span>
       </div>
     </article>
-    <article class="stat-card">
+    <article class="stat-card stat-card-tasks">
       <i-bs name="list-task"></i-bs>
       <div>
         <span class="metric">{{ tasks.length }}</span>
         <span class="metric-label" i18n>Công việc</span>
       </div>
     </article>
-    <article class="stat-card">
+    <article class="stat-card stat-card-completed">
       <i-bs name="check-circle"></i-bs>
       <div>
         <span class="metric">{{ completedTasks }}</span>
         <span class="metric-label" i18n>Đã hoàn thành</span>
       </div>
     </article>
-    <article class="stat-card">
+    <article class="stat-card stat-card-open">
       <i-bs name="clock-history"></i-bs>
       <div>
         <span class="metric">{{ openTasks }}</span>
         <span class="metric-label" i18n>Công việc đang mở</span>
       </div>
     </article>
-    <article class="stat-card">
+    <article class="stat-card stat-card-overdue">
       <i-bs name="exclamation-triangle"></i-bs>
       <div>
         <span class="metric">{{ overdueTasks }}</span>
@@ -59,6 +73,107 @@
     <div>
       <span class="metric">{{ openIntakeCount }}</span>
       <span class="metric-label" i18n>Yêu cầu tiếp nhận đang mở</span>
+    </div>
+  </section>
+
+  <section class="trend-panel">
+    <header class="trend-header">
+      <div>
+        <h2 i18n>Xu hướng công việc</h2>
+        <span class="metric-label" i18n>Công việc đang xử lý và đã hoàn thành</span>
+      </div>
+      <div class="trend-legend">
+        <span class="legend-item legend-in-progress" i18n>Đang xử lý</span>
+        <span class="legend-item legend-completed" i18n>Đã hoàn thành</span>
+      </div>
+    </header>
+
+    <div class="dashboard-chart-grid">
+      @if (taskTrend.length) {
+        <div class="trend-chart">
+          <svg
+            [attr.viewBox]="'0 0 ' + chartWidth + ' ' + chartHeight"
+            role="img"
+            aria-label="Biểu đồ xu hướng công việc"
+            i18n-aria-label>
+            <line
+              class="chart-axis"
+              [attr.x1]="chartPadding"
+              [attr.y1]="chartPadding"
+              [attr.x2]="chartPadding"
+              [attr.y2]="chartHeight - chartPadding" />
+            <line
+              class="chart-axis"
+              [attr.x1]="chartPadding"
+              [attr.y1]="chartHeight - chartPadding"
+              [attr.x2]="chartWidth - chartPadding"
+              [attr.y2]="chartHeight - chartPadding" />
+            <text class="chart-scale" [attr.x]="chartPadding" y="18">{{ trendMax }}</text>
+            <path class="trend-line trend-line-in-progress" [attr.d]="inProgressTrendPath"></path>
+            <path class="trend-line trend-line-completed" [attr.d]="completedTrendPath"></path>
+            @for (point of taskTrend; track point.date) {
+              <circle class="trend-point trend-point-in-progress" [attr.cx]="point.x" [attr.cy]="point.inProgressY" r="4">
+                <title>{{ point.label }}: {{ point.inProgress }}</title>
+              </circle>
+              <circle class="trend-point trend-point-completed" [attr.cx]="point.x" [attr.cy]="point.completedY" r="4">
+                <title>{{ point.label }}: {{ point.completed }}</title>
+              </circle>
+            }
+          </svg>
+          <div class="trend-labels">
+            @for (point of taskTrend; track point.date) {
+              <span>{{ point.label }}</span>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="empty-chart" i18n>Chưa có dữ liệu công việc để hiển thị biểu đồ.</div>
+      }
+
+      <div class="pie-chart-panel">
+        <h3 i18n>Tỉ lệ hoàn thành</h3>
+        @if (tasks.length) {
+          <div class="pie-chart-wrap">
+            <svg
+              class="pie-chart"
+              viewBox="0 0 120 120"
+              role="img"
+              aria-label="Biểu đồ task hoàn thành và chưa hoàn thành"
+              i18n-aria-label>
+              <circle class="pie-track" cx="60" cy="60" [attr.r]="pieRadius"></circle>
+              <circle
+                class="pie-slice pie-slice-completed"
+                cx="60"
+                cy="60"
+                [attr.r]="pieRadius"
+                [attr.stroke-dasharray]="completedPieDasharray"></circle>
+              <circle
+                class="pie-slice pie-slice-incomplete"
+                cx="60"
+                cy="60"
+                [attr.r]="pieRadius"
+                [attr.stroke-dasharray]="incompletePieDasharray"
+                [attr.stroke-dashoffset]="incompletePieDashoffset"></circle>
+            </svg>
+            <div class="pie-center">
+              <span>{{ progress }}%</span>
+              <small i18n>Hoàn thành</small>
+            </div>
+          </div>
+          <div class="pie-stats">
+            <div>
+              <span class="legend-item legend-completed" i18n>Đã hoàn thành</span>
+              <strong>{{ completedTasks }}</strong>
+            </div>
+            <div>
+              <span class="legend-item legend-in-progress" i18n>Chưa hoàn thành</span>
+              <strong>{{ incompleteTasks }}</strong>
+            </div>
+          </div>
+        } @else {
+          <div class="empty-chart" i18n>Chưa có dữ liệu công việc.</div>
+        }
+      </div>
     </div>
   </section>
 </div>
